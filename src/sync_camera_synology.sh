@@ -77,14 +77,12 @@ process_file() {
   local mtime=$(get_mtime "$f") || { log "Failed to get mtime for $f"; return; }
   local now=$(date +%s)
   if ! ((now - mtime > AGE_SEC)); then
-    log "Skipping $f: too new (${AGE_SEC}s threshold)"
     return
   fi
 
   # Skip zero-byte files
   local size=$(get_size "$f") || { log "Failed to get size for $f"; return; }
   if [[ "$size" -eq 0 ]]; then
-    log "Skipping $f: zero-byte file"
     return
   fi
 
@@ -93,7 +91,6 @@ process_file() {
   sleep 2
   local s2=$(get_size "$f") || { log "Failed to get size for $f after wait"; return; }
   if [[ "$s1" != "$s2" ]]; then
-    log "Skipping $f: still growing ($s1 -> $s2 bytes)"
     return
   fi
 
