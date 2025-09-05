@@ -1,0 +1,37 @@
+name: Test Scripts
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install bats
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bats
+        
+    - name: Run syntax check
+      run: |
+        bash -n src/sync_camera_synology.sh
+        bash -n src/apply_camera_retention.sh
+        
+    - name: Run bats tests
+      run: |
+        bats tests/test_sync_camera.bats
+        bats tests/test_retention.bats
+        
+    - name: Test script permissions
+      run: |
+        chmod +x src/*.sh
+        # Verify scripts are executable
+        test -x src/sync_camera_synology.sh
+        test -x src/apply_camera_retention.sh
