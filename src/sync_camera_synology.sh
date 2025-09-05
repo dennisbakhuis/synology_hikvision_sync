@@ -81,17 +81,15 @@ process_file() {
     return
   fi
 
-  # Skip zero-byte .pic files
-  if [[ "$file_type" == "image" ]]; then
-    local size=$(get_size "$f") || { log "Failed to get size for $f"; return; }
-    if [[ "$size" -eq 0 ]]; then
-      log "Skipping $f: zero-byte file"
-      return
-    fi
+  # Skip zero-byte files
+  local size=$(get_size "$f") || { log "Failed to get size for $f"; return; }
+  if [[ "$size" -eq 0 ]]; then
+    log "Skipping $f: zero-byte file"
+    return
   fi
 
   # Skip if still growing
-  local s1=$(get_size "$f") || { log "Failed to get size for $f"; return; }
+  local s1="$size"  # Use already retrieved size
   sleep 2
   local s2=$(get_size "$f") || { log "Failed to get size for $f after wait"; return; }
   if [[ "$s1" != "$s2" ]]; then
@@ -101,10 +99,10 @@ process_file() {
 
   # Format timestamp
   local ts
-  if date -d @"$mtime" +"%Y-%m-%d_%H-%M-%S" 2>/dev/null; then
-    ts=$(date -d @"$mtime" +"%Y-%m-%d_%H-%M-%S")
-  elif date -r "$mtime" +"%Y-%m-%d_%H-%M-%S" 2>/dev/null; then
-    ts=$(date -r "$mtime" +"%Y-%m-%d_%H-%M-%S")
+  if ts=$(date -d @"$mtime" +"%Y-%m-%d_%H-%M-%S" 2>/dev/null); then
+    : # ts is already set
+  elif ts=$(date -r "$mtime" +"%Y-%m-%d_%H-%M-%S" 2>/dev/null); then
+    : # ts is already set
   else
     log "Failed to format timestamp for $f"
     return

@@ -40,6 +40,9 @@ setup() {
     # Create empty .pic file (should be skipped)
     touch "$TEST_SRC/datadir001/test_empty.pic"
     
+    # Create empty .mp4 file (should be skipped)
+    touch "$TEST_SRC/datadir001/test_empty.mp4"
+    
     # Create a non-empty .pic file
     echo "fake image data" > "$TEST_SRC/datadir001/test_image.pic"
     if command -v touch >/dev/null 2>&1; then
@@ -277,6 +280,79 @@ EOF
     [[ "$output" =~ ^\[[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}\]\ test\ message$ ]]
 }
 
+@test "timestamp formatting works correctly and doesn't loop" {
+    # Test the timestamp formatting logic to prevent infinite loops
+    cat > "$TEST_DIR/test_timestamp.sh" << 'EOF'
+#!/bin/bash
+
+# Mock timestamp formatting function from sync_camera_synology.sh
+format_timestamp() {
+  local mtime="$1"
+  local ts
+  
+  # This is the fixed version that properly captures output
+  if ts=$(date -d @"$mtime" +"%Y-%m-%d_%H-%M-%S" 2>/dev/null); then
+    echo "timestamp: $ts"
+    return 0
+  elif ts=$(date -r "$mtime" +"%Y-%m-%d_%H-%M-%S" 2>/dev/null); then
+    echo "timestamp: $ts"
+    return 0
+  else
+    echo "Failed to format timestamp"
+    return 1
+  fi
+}
+
+# Test with current time (should work on all platforms)
+current_time=$(date +%s)
+format_timestamp "$current_time"
+EOF
+    chmod +x "$TEST_DIR/test_timestamp.sh"
+    
+    # Run with timeout to catch infinite loops
+    run timeout 5 "$TEST_DIR/test_timestamp.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"timestamp: "* ]]
+    # Ensure output contains properly formatted timestamp (YYYY-MM-DD_HH-MM-SS pattern)
+    [[ "$output" =~ timestamp:\ [0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2} ]]
+}
+
+@test "zero-byte files are skipped correctly" {
+    # Test the zero-byte file filtering logic
+    cat > "$TEST_DIR/test_zero_byte.sh" << 'EOF'
+#!/bin/bash
+
+# Test zero-byte file detection
+test_zero_byte_check() {
+  local f="$1"
+  local file_type="$2"
+  
+  if [[ ! -s "$f" ]]; then
+    echo "Skipping empty $file_type file: $f"
+    return 0
+  else
+    echo "Processing $file_type file: $f"
+    return 0
+  fi
+}
+
+# Test with empty video file
+test_zero_byte_check "$1" "video"
+# Test with empty image file  
+test_zero_byte_check "$2" "image"
+# Test with non-empty file
+test_zero_byte_check "$3" "image"
+EOF
+    chmod +x "$TEST_DIR/test_zero_byte.sh"
+    
+    # Test with empty mp4, empty pic, and non-empty pic
+    run "$TEST_DIR/test_zero_byte.sh" "$TEST_SRC/datadir001/test_empty.mp4" "$TEST_SRC/datadir001/test_empty.pic" "$TEST_SRC/datadir001/test_image.pic"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Skipping empty video file: "*"test_empty.mp4"* ]]
+    [[ "$output" == *"Skipping empty image file: "*"test_empty.pic"* ]]
+    [[ "$output" == *"Processing image file: "*"test_image.pic"* ]]
+}
+
 @test "process_file function handles different file types correctly" {
     # Create a mock process_file function to test logic
     cat > "$TEST_DIR/test_process_file.sh" << 'EOF'
@@ -297,12 +373,10 @@ process_file_mock() {
     return 1
   fi
   
-  # For images, check if file is empty
-  if [[ "$file_type" == "image" ]]; then
-    if [[ ! -s "$f" ]]; then
-      echo "Skipping empty image file: $f"
-      return 0
-    fi
+  # Check if file is empty (applies to both video and image files)
+  if [[ ! -s "$f" ]]; then
+    echo "Skipping empty $file_type file: $f"
+    return 0
   fi
   
   # Determine extension
