@@ -1,4 +1,4 @@
-# Synology Camera Sync Script
+# Synology Hikvsion Sync Script
 
 Author: Dennis Bakhuis  
 Date: 2025-09-05  
