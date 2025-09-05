@@ -15,15 +15,14 @@ This script automates syncing both videos and images from multiple Hikvision cam
 3. **Edit the scripts** to match your camera paths and preferences:
    - Update `CAMERAS` array in `src/sync_camera_synology.sh`
    - Configure retention settings in `src/apply_camera_retention.sh`
-4. **Test locally** using `make test`
-5. **Clone your customized repo directly on your Synology** via SSH:
+4. **Clone your customized repo directly on your Synology** via SSH:
    ```bash
    ssh admin@your-synology-ip
    cd /volume1
    git clone https://github.com/YOUR_USERNAME/synology_file_sync.git
    chmod +x synology_file_sync/src/*.sh
    ```
-6. **Set up scheduled tasks** in DSM Task Scheduler
+5. **Set up scheduled tasks** in DSM Task Scheduler
 
 This approach gives you:
 - ✅ **Version control** for your custom configuration  
