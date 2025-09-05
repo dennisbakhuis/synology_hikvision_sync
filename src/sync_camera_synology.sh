@@ -144,7 +144,7 @@ process_file() {
   fi
 }
 
-export -f process_file
+export -f process_file get_mtime get_size log
 export AGE_SEC
 
 # Process each camera configuration
