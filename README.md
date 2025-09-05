@@ -1,4 +1,4 @@
-# Synology Hikvsion Sync Script
+# Synology Hikvision Sync Script
 
 Author: Dennis Bakhuis  
 Date: 2025-09-05  
