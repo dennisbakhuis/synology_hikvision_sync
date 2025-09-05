@@ -115,11 +115,36 @@ process_file() {
     ext="jpg"
   fi
   
-  dest="$dest_dir/${ts}-${cam_tag}.${ext}"
+  # Create base destination filename
+  local base_dest="$dest_dir/${ts}-${cam_tag}.${ext}"
+  
+  # Check if file with same timestamp already exists, if so add unique suffix
+  local dest="$base_dest"
+  local counter=1
+  while [[ -f "$dest" ]]; do
+    # Check if existing file is identical (same size) to avoid true duplicates
+    local existing_size=$(get_size "$dest") || { log "Failed to get size for existing $dest"; break; }
+    local source_size=$(get_size "$f") || { log "Failed to get size for source $f"; break; }
+    
+    if [[ "$existing_size" -eq "$source_size" ]]; then
+      log "Identical file already exists: $dest (size: $existing_size bytes), skipping $f"
+      return
+    fi
+    
+    # Generate new filename with counter
+    local name_without_ext="${base_dest%.*}"
+    local extension="${base_dest##*.}"
+    dest="${name_without_ext}_${counter}.${extension}"
+    counter=$((counter + 1))
+    
+    # Prevent infinite loops
+    if [[ $counter -gt 1000 ]]; then
+      log "Too many filename collisions for $f, skipping"
+      return
+    fi
+  done
+  
   local tmp="${dest}.part.$$"
-
-  # Skip if already exists
-  [[ -f "$dest" ]] && return
 
   # Atomic copy via temporary file
   if cp -p -- "$f" "$tmp" 2>/dev/null || { 
