@@ -12,6 +12,7 @@
 # Format: "source_path:destination_path:camera_tag"
 CAMERAS=(
   "/volume3/Camera-Tuin:/volume3/Camera/Tuin:garden"
+  "/volume3/Cemera-Oprit:/volume3/Camera/Oprit:driveway"
   # Add more cameras here, for example:
   # "/volume3/Camera-Oprit:/volume3/Camera/Oprit:driveway"
 )

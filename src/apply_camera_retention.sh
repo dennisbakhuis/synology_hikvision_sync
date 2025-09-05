@@ -11,6 +11,7 @@
 # Configuration - should match your sync_camera_synology.sh CAMERAS array
 CAMERAS=(
   "/volume3/Camera/Tuin:garden"
+  "/volume3/Camera/Oprit:driveway"
   # Add more camera destinations here, for example:
   # "/volume3/Camera/Oprit:driveway"
 )
