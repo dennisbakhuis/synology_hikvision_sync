@@ -7,7 +7,6 @@
 #
 # File retention policy script for camera sync files. Automatically deletes files older than specified retention period.
 # Designed to work with sync_camera_synology.sh organized folder structure.
-# Cross-platform compatible with Linux, macOS, and FreeBSD.
 
 # Configuration - should match your sync_camera_synology.sh CAMERAS array
 CAMERAS=(

@@ -6,8 +6,6 @@ License: MIT
 
 This script automates syncing both videos and images from multiple Hikvision cameras' NAS storage to organized destination folders with timestamped filenames. It converts `.pic` files to `.jpg` and organizes files into separate `video/` and `images/` directories.  
 
-Designed for Synology NAS systems, but cross-platform compatible with Linux, macOS, and FreeBSD.
-
 ## Quick Start
 
 **The easiest way to use this project:**
@@ -46,36 +44,20 @@ This approach gives you:
 
 ## Installation on Synology
 
-### 1. Upload Scripts
-
-**Using Make (Recommended):**
+**Git Clone Method (Recommended):**
 ```bash
-# Upload both scripts automatically
-make install-synology SYNOLOGY_HOST=admin@your-synology-ip
-
-# This will:
-# - Create /volume1/scripts/ directory
-# - Upload both src/sync_camera_synology.sh and src/apply_camera_retention.sh
-# - Set correct executable permissions
-```
-
-**Manual Method:**
-1. Open **File Station** in DSM
-2. Create directory: `/volume1/scripts/` (if it doesn't exist)
-3. Upload both scripts to `/volume1/scripts/`
-4. Right-click → **Properties** → **Permission** → Check **Executable**
-
-**SSH Method:**
-```bash
-# Upload scripts and make executable
-scp src/sync_camera_synology.sh admin@your-synology-ip:/volume1/scripts/
-scp src/apply_camera_retention.sh admin@your-synology-ip:/volume1/scripts/
+# SSH into your Synology
 ssh admin@your-synology-ip
-chmod +x /volume1/scripts/sync_camera_synology.sh
-chmod +x /volume1/scripts/apply_camera_retention.sh
+
+# Clone the repository directly to your Synology
+cd /volume1
+git clone https://github.com/YOUR_USERNAME/synology_hikvision_sync.git
+
+# Make scripts executable
+chmod +x synology_hikvision_sync/src/*.sh
 ```
 
-### 2. Configure Cameras
+### Configure Cameras
 Edit the script to configure your cameras:
 ```bash
 CAMERAS=(
@@ -87,7 +69,7 @@ CAMERAS=(
 
 Format: `"source_hikvision_path:destination_clean_path:camera_tag"`
 
-### 3. Set Up Scheduled Task
+### Set Up Scheduled Task
 1. Open **Control Panel** → **Task Scheduler**
 2. Click **Create** → **Scheduled Task** → **User-defined script**
 3. **General tab**:
@@ -98,17 +80,17 @@ Format: `"source_hikvision_path:destination_clean_path:camera_tag"`
    - Frequency: `Every 5 minutes`
    - First run time: Current time + 5 minutes
 5. **Task Settings tab**:
-   - User-defined script: `/volume1/scripts/sync_camera_synology.sh`
+   - User-defined script: `/volume1/synology_hikvision_sync/src/sync_camera_synology.sh`
    - Send run details by email: ✓ (optional, for debugging)
 6. Click **OK**
 
-### 4. Test Manually
+### Test Manually
 ```bash
 # SSH into your Synology
 ssh admin@your-synology-ip
 
 # Test the script
-/volume1/scripts/sync_camera_synology.sh
+/volume1/synology_hikvision_sync/src/sync_camera_synology.sh
 
 # Check logs in real-time
 tail -f /var/log/messages | grep sync_camera
@@ -213,19 +195,17 @@ DRY_RUN=false     # Set to true for preview mode
 
 **Note**: Use only the destination paths from your sync script (not the source paths).
 
-#### 2. Upload and Test
+#### 2. Test Retention Script
 ```bash
-# Upload retention script
-scp src/apply_camera_retention.sh admin@your-synology-ip:/volume1/scripts/
+# SSH into your Synology
 ssh admin@your-synology-ip
-chmod +x /volume1/scripts/apply_camera_retention.sh
 
 # Test with dry-run (safe preview)
-sed -i 's/DRY_RUN=false/DRY_RUN=true/' /volume1/scripts/apply_camera_retention.sh
-/volume1/scripts/apply_camera_retention.sh
+sed -i 's/DRY_RUN=false/DRY_RUN=true/' /volume1/synology_hikvision_sync/src/apply_camera_retention.sh
+/volume1/synology_hikvision_sync/src/apply_camera_retention.sh
 
 # Enable actual retention when ready
-sed -i 's/DRY_RUN=true/DRY_RUN=false/' /volume1/scripts/apply_camera_retention.sh
+sed -i 's/DRY_RUN=true/DRY_RUN=false/' /volume1/synology_hikvision_sync/src/apply_camera_retention.sh
 ```
 
 #### 3. Schedule Cleanup Task
@@ -238,7 +218,7 @@ sed -i 's/DRY_RUN=true/DRY_RUN=false/' /volume1/scripts/apply_camera_retention.s
    - Run on: `Daily`
    - Time: `02:00` (2 AM - low activity time)
 5. **Task Settings tab**:
-   - User-defined script: `/volume1/scripts/apply_camera_retention.sh`
+   - User-defined script: `/volume1/synology_hikvision_sync/src/apply_camera_retention.sh`
 6. Click **OK**
 
 ### Retention Configuration Examples
@@ -388,13 +368,13 @@ Before deploying to production:
 ```bash
 # 1. Test on Synology with real paths but dry-run retention
 ssh admin@your-synology-ip
-/volume1/scripts/sync_camera_synology.sh  # Run sync once
-sed -i 's/DRY_RUN=false/DRY_RUN=true/' /volume1/scripts/apply_camera_retention.sh
-/volume1/scripts/apply_camera_retention.sh  # Preview retention policy
+/volume1/synology_hikvision_sync/src/sync_camera_synology.sh  # Run sync once
+sed -i 's/DRY_RUN=false/DRY_RUN=true/' /volume1/synology_hikvision_sync/src/apply_camera_retention.sh
+/volume1/synology_hikvision_sync/src/apply_camera_retention.sh  # Preview retention policy
 
 # 2. Monitor logs during test
 tail -f /var/log/messages | grep -E "(sync_camera|apply_camera_retention)"
 
 # 3. Enable actual retention when satisfied
-sed -i 's/DRY_RUN=true/DRY_RUN=false/' /volume1/scripts/apply_camera_retention.sh
+sed -i 's/DRY_RUN=true/DRY_RUN=false/' /volume1/synology_hikvision_sync/src/apply_camera_retention.sh
 ```

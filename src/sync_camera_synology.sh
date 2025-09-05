@@ -7,7 +7,6 @@
 #
 # Multi-camera sync script for Hikvision NAS storage on Synology systems.
 # Syncs videos (.mp4) and images (.pic -> .jpg) to organized folders with timestamped filenames.
-# Cross-platform compatible with Linux, macOS, and FreeBSD.
 
 # Configuration for multiple cameras
 # Format: "source_path:destination_path:camera_tag"
