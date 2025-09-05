@@ -15,9 +15,9 @@ setup() {
     mkdir -p "$TEST_SRC/datadir001"
     mkdir -p "$TEST_DST"
     
-    # Create test files with different ages
-    touch "$TEST_SRC/datadir001/test_old.mp4"
-    touch "$TEST_SRC/datadir001/test_old.pic"
+    # Create test files with different ages (non-empty)
+    echo "fake video data" > "$TEST_SRC/datadir001/test_old.mp4"
+    echo "fake pic data" > "$TEST_SRC/datadir001/test_old.pic"
     
     # Make files old enough to process (older than 120 seconds)
     # Use a trick to set file time in the past
@@ -35,7 +35,7 @@ setup() {
     fi
     
     # Create a recent file (should be skipped)
-    touch "$TEST_SRC/datadir001/test_new.mp4"
+    echo "fake new video" > "$TEST_SRC/datadir001/test_new.mp4"
     
     # Create empty .pic file (should be skipped)
     touch "$TEST_SRC/datadir001/test_empty.pic"
@@ -409,6 +409,12 @@ EOF
     
     # Test with video file and image file
     run "$TEST_DIR/test_process_file.sh" "$TEST_SRC/datadir001/test_old.mp4" "$TEST_DST" "$TEST_SRC/datadir001/test_image.pic"
+    
+    # Debug output for CI troubleshooting
+    echo "Test exit status: $status" >&3
+    echo "Test output:" >&3 
+    echo "$output" >&3
+    
     [ "$status" -eq 0 ]
     [[ "$output" == *"Processing:"*"test_old.mp4"*"(video)"* ]]
     [[ "$output" == *"Would copy to:"*"video/"*".mp4"* ]]
