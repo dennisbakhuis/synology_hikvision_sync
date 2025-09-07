@@ -34,25 +34,17 @@ jobs:
     - name: Run tests
       run: make test
 
-  build-and-push:
+  version-check:
     runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'pull_request'
     permissions:
-      contents: write
-      packages: write
-      
+      contents: read
+      packages: read
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-        
     - name: Extract version from pyproject.toml
       id: version
       run: |
@@ -86,20 +78,44 @@ jobs:
             | grep -x "v$VERSION" || echo "")
           
           if [ -n "$VERSION_EXISTS" ]; then
-            echo "Version v$VERSION already exists in GHCR, skipping build"
-            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "❌ Version v$VERSION already exists in GHCR!"
+            echo "Please update the version in pyproject.toml to a new version before merging."
+            exit 1
           else
-            echo "Version v$VERSION does not exist in GHCR, proceeding with build"
-            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "✅ Version v$VERSION is new and can be released"
           fi
         else
-          echo "Could not check GHCR packages (HTTP $RESPONSE), proceeding with build"
-          echo "should_build=true" >> $GITHUB_OUTPUT
+          echo "Could not check GHCR packages (HTTP $RESPONSE), allowing PR to proceed"
         fi
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+      packages: write
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract version from pyproject.toml
+      id: version
+      run: |
+        VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Found version: $VERSION"
         
     - name: Extract metadata
       id: meta
-      if: steps.check_version.outputs.should_build == 'true'
       uses: docker/metadata-action@v5
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -108,7 +124,6 @@ jobs:
           type=raw,value=latest
           
     - name: Build and push Docker image
-      if: steps.check_version.outputs.should_build == 'true'
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -116,13 +131,7 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         
-    - name: Skip build (version exists)
-      if: steps.check_version.outputs.should_build == 'false'
-      run: |
-        echo "Skipping Docker build as version v${{ steps.version.outputs.version }} already exists"
-        
     - name: Create GitHub Release
-      if: steps.check_version.outputs.should_build == 'true'
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ steps.version.outputs.version }}
