@@ -1,379 +1,371 @@
-# Synology Hikvision Sync Script
+# Synology Hikvision Sync 📹
 
-Author: Dennis Bakhuis  
-Date: 2025-09-05  
-License: MIT
+A Python-based container solution designed for **Synology NAS** systems that serve as **NFS storage** for **Hikvision cameras**. This tool replaces Surveillance Station by intelligently reorganizing the camera's native storage into clean, organized folders with timestamped filenames - leveraging the cameras' built-in smart features rather than requiring additional NVR software.
 
-This script automates syncing both videos and images from multiple Hikvision cameras' NAS storage to organized destination folders with timestamped filenames. It converts `.pic` files to `.jpg` and organizes files into separate `video/` and `images/` directories.  
+## 🎯 **Purpose & Use Case**
 
-## Quick Start
+This script is specifically designed for setups where:
+- 📂 **Synology NAS** acts as NFS storage target for Hikvision cameras
+- 📹 **Hikvision cameras** record directly to NAS storage (bypassing Surveillance Station)
+- 🧠 **Camera intelligence** handles motion detection, recording triggers, and smart features
+- 🗂️ **Organization** is needed to convert Hikvision's proprietary storage format into accessible MP4/JPG files
+- 🔄 **Automation** replaces manual file management or expensive NVR licenses
 
-**The easiest way to use this project:**
+**Benefits over Surveillance Station:**
+- ✅ No NVR license costs per camera
+- ✅ Uses cameras' native intelligence and processing power  
+- ✅ Direct NFS storage - no transcoding overhead
+- ✅ Automated retention management
+- ✅ Clean, accessible file organization
+- ✅ Preserves original video quality
 
-1. **Fork this repository** to your own GitHub account
-2. **Clone your fork** to your local machine  
-3. **Edit the scripts** to match your camera paths and preferences:
-   - Update `CAMERAS` array in `src/sync_camera_synology.sh`
-   - Configure retention settings in `src/apply_camera_retention.sh`
-4. **Clone your customized repo directly on your Synology** via SSH:
+**Author**: Dennis Bakhuis  
+**License**: MIT
+
+## 🏗️ **System Architecture**
+
+```
+┌─────────────────┐    NFS Mount    ┌─────────────────┐    Docker Container    ┌─────────────────┐
+│  Hikvision      │ ──────────────► │   Synology      │ ─────────────────────► │   This Script   │
+│  Camera         │                 │   NAS           │                        │                 │
+│                 │  Records to:    │                 │  Processes:            │  Outputs:       │
+│ • Motion detect │  /volume3/      │ • NFS Server    │  • Extracts segments   │ • Clean MP4s    │
+│ • Smart features│    Camera-Tuin/ │ • File Storage  │  • Converts formats    │ • Organized JPGs│
+│ • H.264/H.265   │    Camera-Oprit/│ • Docker Host   │  • Applies retention   │ • Folder struct │
+└─────────────────┘                 └─────────────────┘                        └─────────────────┘
+```
+
+**Setup Requirements:**
+1. 🔧 Configure Hikvision cameras to use Synology NAS as NFS storage target
+2. 📁 Cameras record directly to `/volume3/Camera-Name/` directories  
+3. 🐳 Run this container to process and organize the footage
+4. 📂 Access clean, organized files in `/volume1/organized/`
+
+## 🚀 Quick Start with Docker
+
+The easiest way to use this tool is with the pre-built container from GitHub Container Registry:
+
+```bash
+# Run continuously (every 10 minutes by default)
+docker run -d \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume1/organized:/output \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+
+# Run once and exit
+docker run --rm -e RUN_MODE=once \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume1/organized:/output \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+```
+
+### Camera Mounting Pattern
+Each camera must be mounted separately to `/input/<camera-name>`:
+
+```bash
+# Multiple cameras with original names (Camera-Tuin, Camera-Oprit)
+docker run -d \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume3/Camera-Front:/input/Camera-Front \
+  -v /volume1/organized:/output \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  
+# With camera renaming using CAMERA_TRANSLATION
+docker run -d \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume3/Camera-Front:/input/Camera-Front \
+  -v /volume1/organized:/output \
+  -e CAMERA_TRANSLATION="Camera-Tuin:tuin,Camera-Oprit:driveway,Camera-Front:front" \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+```
+
+This will create organized output like:
+```
+/volume1/organized/
+├── tuin/           # Renamed from Camera-Tuin
+│   ├── video/
+│   └── images/
+├── driveway/       # Renamed from Camera-Oprit  
+│   ├── video/
+│   └── images/
+└── front/          # Renamed from Camera-Front
+    ├── video/
+    └── images/
+```
+
+## 🔧 Configuration
+
+### Cron Scheduling
+Control how frequently the sync runs:
+
+```bash
+# Run every 5 minutes
+docker run -d -e CRON_INTERVAL=5 \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume1/organized:/output \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+
+# Run every hour  
+docker run -d -e CRON_INTERVAL=60 \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume1/organized:/output \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+
+# Run every 6 hours
+docker run -d -e CRON_INTERVAL=360 \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume1/organized:/output \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+```
+
+### Camera Translation (Optional)
+Map camera folder names to friendly tags using environment variables:
+
+```bash
+docker run -d \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume3/Camera-Front:/input/Camera-Front \
+  -v /volume1/organized:/output \
+  -e CAMERA_TRANSLATION="Camera-Tuin:tuin,Camera-Oprit:driveway,Camera-Front:front" \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+```
+
+**Translation Format**: `"original-name:new-name,another-original:another-new"`
+- **Source mount**: `/volume3/Camera-Tuin` → **Container path**: `/input/Camera-Tuin` → **Output folder**: `/output/tuin/`
+
+### Custom Retention Policy
+```bash
+# Keep files for 30 days
+docker run -d -e RETENTION_DAYS=30 \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume1/organized:/output \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  
+# Disable retention (keep all files)
+docker run -d -e RETENTION_DAYS=0 \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume1/organized:/output \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+```
+
+### Advanced Configuration
+```bash
+docker run -d \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume3/Camera-Front:/input/Camera-Front \
+  -v /volume1/organized:/output \
+  -v /tmp/hikvision_cache:/cache \
+  -e CRON_INTERVAL=15 \
+  -e RETENTION_DAYS=60 \
+  -e CAMERA_TRANSLATION="Camera-Tuin:garden,Camera-Oprit:driveway,Camera-Front:entrance" \
+  -e CACHE_DIR=/cache \
+  -e LOCK_FILE=/cache/processing.lock \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+```
+
+## 📁 Directory Structure
+
+### Input Structure (Hikvision NAS)
+Each camera is mounted separately to its own path in `/input/`:
+```
+Host Synology:                    Container Input:
+/volume3/Camera-Tuin/         →   /input/Camera-Tuin/
+├── datadir0/                     ├── datadir0/
+├── datadir1/                     ├── datadir1/
+└── ...                           └── ...
+
+/volume3/Camera-Oprit/        →   /input/Camera-Oprit/
+├── datadir0/                     ├── datadir0/
+└── ...                           └── ...
+```
+
+### Output Structure (Organized)
+The container creates clean, organized folders in `/output/`:
+```
+Container Output:                 Host Synology:
+/output/                      →   /volume1/organized/
+├── tuin/                         ├── tuin/              # Renamed from Camera-Tuin
+│   ├── video/                    │   ├── video/
+│   │   ├── 2025-09-07_14-30-15-tuin.mp4     │   │   ├── 2025-09-07_14-30-15-tuin.mp4
+│   │   └── 2025-09-07_14-32-20-tuin.mp4     │   │   └── 2025-09-07_14-32-20-tuin.mp4
+│   └── images/                   │   └── images/
+│       ├── 2025-09-07_14-30-15-tuin.jpg     │       ├── 2025-09-07_14-30-15-tuin.jpg
+│       └── 2025-09-07_14-30-18-tuin.jpg     │       └── 2025-09-07_14-30-18-tuin.jpg
+└── driveway/                     └── driveway/          # Renamed from Camera-Oprit
+    ├── video/                        ├── video/
+    └── images/                       └── images/
+```
+
+## ✨ Features
+
+- 📂 **NFS Integration**: Designed specifically for Synology NAS as NFS storage target
+- 🔄 **Automatic Discovery**: Discovers cameras from NFS-mounted directory structure  
+- 📹 **Format Conversion**: Converts Hikvision's proprietary format to standard MP4/JPG files
+- 🏷️ **Smart Organization**: Creates timestamped filenames with customizable camera tags
+- 🗂️ **Surveillance Station Alternative**: Replaces expensive NVR licensing with camera intelligence
+- ⏰ **Automated Retention**: Configurable file retention policies (default: 90 days)
+- 🔒 **Safe Processing**: File locking prevents concurrent runs and data corruption
+- 📊 **Comprehensive Logging**: Detailed progress and error reporting with timestamps
+- 🐳 **Container Ready**: No dependencies to install, just run with Docker
+- 🎯 **Purpose-built**: Uses the `libhikvision` library optimized for Hikvision storage extraction
+
+## 🏗️ Building from Source
+
+If you want to build your own container:
+
+```bash
+git clone https://github.com/dennisbakhuis/synology_hikvision_sync.git
+cd synology_hikvision_sync
+docker build -t hikvision-sync .
+```
+
+## 🧪 Development
+
+### Running Tests
+```bash
+# Install dependencies
+uv sync
+
+# Run full test suite
+make test
+
+# Run specific tests
+uv run python -m pytest tests/ -v
+```
+
+### Local Development
+```bash
+# Install dependencies
+uv sync
+
+# Run locally
+uv run python src/process_hikvision_folder.py
+```
+
+## 📋 Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RUN_MODE` | `cron` | Execution mode: `cron` (continuous) or `once` (single run) |
+| `CRON_INTERVAL` | `10` | Minutes between sync runs (1-1440) |
+| `RETENTION_DAYS` | `90` | Days to keep files (0 = disabled) |
+| `INPUT_DIR` | `/input` | Directory containing camera folders |
+| `OUTPUT_DIR` | `/output` | Directory for organized output |
+| `CACHE_DIR` | `/tmp/hikvision_cache` | Temporary extraction cache |
+| `LOCK_FILE` | `/tmp/process_hikvision_folder.lock` | Lock file location |
+| `CAMERA_TRANSLATION` | `""` | Camera name mappings (optional) |
+
+## 🔧 Synology Integration
+
+### Using Docker on Synology
+1. Enable Docker package in Package Center
+2. Open Docker app and go to Registry
+3. Search for container or use command line:
+
+```bash
+# SSH into your Synology
+ssh admin@your-synology-ip
+
+# Run the container
+sudo docker run --rm \
+  -v /volume1/your-camera-path:/input \
+  -v /volume1/organized-output:/output \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+```
+
+### Persistent Container Setup  
+1. **SSH into Synology** and run:
    ```bash
-   ssh admin@your-synology-ip
-   cd /volume1
-   git clone https://github.com/YOUR_USERNAME/synology_file_sync.git
-   chmod +x synology_file_sync/src/*.sh
+   # Start persistent container with automatic restart
+   docker run -d --name hikvision-sync --restart unless-stopped \
+     -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+     -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+     -v /volume3/Camera-Front:/input/Camera-Front \
+     -v /volume1/organized:/output \
+     -e CRON_INTERVAL=10 \
+     -e CAMERA_TRANSLATION="Camera-Tuin:tuin,Camera-Oprit:driveway,Camera-Front:front" \
+     ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
    ```
-5. **Set up scheduled tasks** in DSM Task Scheduler
 
-This approach gives you:
-- ✅ **Version control** for your custom configuration  
-- ✅ **Easy updates** by pulling from upstream
-- ✅ **Backup** of your settings in your GitHub repo
-- ✅ **Direct deployment** to Synology without file transfers
+2. **Monitor logs**:
+   ```bash
+   # View logs
+   docker logs hikvision-sync
+   
+   # Follow logs in real-time  
+   docker logs -f hikvision-sync
+   ```
 
-## Features
-- **Multi-camera support**: Configure multiple cameras with different source/destination paths
-- **File types**: Syncs both videos (`.mp4`) and images (`.pic` → `.jpg`)
-- **Organization**: Separates files into `video/` and `images/` subdirectories
-- **Safety checks**: Age validation, size stability checks, zero-byte file filtering
-- **Atomic operations**: Temporary files + atomic moves prevent partial transfers
-- **Cross-platform**: Compatible with Linux, macOS, and FreeBSD
-- **Logging**: Timestamped actions and progress reporting
-- **Locking**: Prevents overlapping executions
-- **Timestamped filenames**: Human-readable format `YYYY-MM-DD_HH-MM-SS-<CAM_TAG>.(mp4|jpg)`
+### Alternative: One-time Task Setup
+If you prefer the old approach using Task Scheduler:
+1. **Control Panel** → **Task Scheduler**
+2. **Create** → **Scheduled Task** → **User-defined script**  
+3. Configure:
+   - **General**: Task name: "Camera Sync"
+   - **Schedule**: Daily, every 10 minutes
+   - **Task Settings**:
+   ```bash
+   docker run --rm -e RUN_MODE=once \
+     -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+     -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+     -v /volume3/Camera-Front:/input/Camera-Front \
+     -v /volume1/organized:/output \
+     -e CAMERA_TRANSLATION="Camera-Tuin:tuin,Camera-Oprit:driveway,Camera-Front:front" \
+     ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+   ```
 
-## Installation on Synology
+## 🐛 Troubleshooting
 
-**Git Clone Method (Recommended):**
+### Finding Camera Storage
 ```bash
-# SSH into your Synology
-ssh admin@your-synology-ip
-
-# Clone the repository directly to your Synology
-cd /volume1
-git clone https://github.com/YOUR_USERNAME/synology_hikvision_sync.git
-
-# Make scripts executable
-chmod +x synology_hikvision_sync/src/*.sh
-```
-
-### Configure Cameras
-Edit the script to configure your cameras:
-```bash
-CAMERAS=(
-  "/volume3/Camera-Tuin:/volume3/Camera/Tuin:garden"
-  "/volume3/Camera-Oprit:/volume3/Camera/Oprit:driveway"
-  "/volume3/Camera-Front:/volume3/Camera/Front:front"
-)
-```
-
-Format: `"source_hikvision_path:destination_clean_path:camera_tag"`
-
-### Set Up Scheduled Task
-1. Open **Control Panel** → **Task Scheduler**
-2. Click **Create** → **Scheduled Task** → **User-defined script**
-3. **General tab**:
-   - Task name: `Camera Sync`
-   - User: `root` (or admin user)
-4. **Schedule tab**:
-   - Run on: `Daily`
-   - Frequency: `Every 5 minutes`
-   - First run time: Current time + 5 minutes
-5. **Task Settings tab**:
-   - User-defined script: `/volume1/synology_hikvision_sync/src/sync_camera_synology.sh`
-   - Send run details by email: ✓ (optional, for debugging)
-6. Click **OK**
-
-### Test Manually
-```bash
-# SSH into your Synology
-ssh admin@your-synology-ip
-
-# Test the script
-/volume1/synology_hikvision_sync/src/sync_camera_synology.sh
-
-# Check logs in real-time
-tail -f /var/log/messages | grep sync_camera
-```
-
-## Configuration Examples
-
-### Single Camera Setup
-```bash
-CAMERAS=(
-  "/volume1/Hikvision:/volume1/CleanVideos/BackYard:backyard"
-)
-```
-
-### Multi-Camera Setup
-```bash
-CAMERAS=(
-  "/volume3/Camera-Garden:/volume3/Organized/Garden:garden"
-  "/volume3/Camera-Driveway:/volume3/Organized/Driveway:driveway"
-  "/volume3/Camera-Front:/volume3/Organized/Front:front"
-  "/volume3/Camera-Side:/volume3/Organized/Side:side"
-)
-```
-
-## Output Structure
-After running, your destination folders will look like:
-```
-/volume3/Camera/Garden/
-├── video/
-│   ├── 2025-09-05_14-30-15-garden.mp4
-│   ├── 2025-09-05_14-32-20-garden.mp4
-│   └── ...
-└── images/
-    ├── 2025-09-05_14-30-15-garden.jpg
-    ├── 2025-09-05_14-30-18-garden.jpg
-    └── ...
-```
-
-## Troubleshooting
-
-### Find Your Hikvision Storage Location
-```bash
-# SSH into Synology and find where cameras store files
+# SSH into Synology and locate Hikvision data
 find /volume* -name "datadir*" -type d 2>/dev/null
-find /volume* -name "*.mp4" -o -name "*.pic" 2>/dev/null | head -10
 ```
 
-### Check Script Logs
+### Container Logs
 ```bash
-# View system logs for script activity
-sudo tail -f /var/log/messages | grep sync_camera
+# Run with verbose logging (one-time)
+docker run --rm -e RUN_MODE=once \
+  -v /volume3/Camera-Tuin:/input/Camera-Tuin \
+  -v /volume3/Camera-Oprit:/input/Camera-Oprit \
+  -v /volume1/organized:/output \
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
 
-# Check Task Scheduler history in DSM
-# Control Panel → Task Scheduler → Select your task → Action → View Result
+# Monitor running container logs
+docker logs -f hikvision-sync
 ```
 
 ### Common Issues
-- **Permission denied**: Ensure script is executable and Task Scheduler runs as `root`
-- **Directory not found**: Verify source paths match your Hikvision storage location
-- **No files processed**: Check `AGE_SEC` setting (default 120s) - files must be older than this
+- **No cameras found**: Check that input directory contains camera folders
+- **Permission denied**: Ensure Docker has access to mount paths
+- **Extraction failures**: Verify Hikvision data format is supported
 
-## Advanced Configuration
+## 📈 Container Registry
 
-### Adjust Processing Delays
-```bash
-# Only process files older than 300 seconds (5 minutes)
-AGE_SEC=300
-```
+The container is automatically built and published to:
+- `ghcr.io/dennisbakhuis/synology_hikvision_sync:latest`
+- `ghcr.io/dennisbakhuis/synology_hikvision_sync:main`
+- Tagged versions for specific releases
 
-### Add More File Types
-```bash
-# If your cameras store different image formats
-IMAGE_PATTERNS=("*.pic" "*.jpg" "*.jpeg")
-```
+## 🤝 Contributing
 
-## File Retention Management
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `make test`
+5. Submit a pull request
 
-The project includes a companion script `apply_camera_retention.sh` for automatic file retention policy management.
+## 📄 License
 
-### Features
-- **Automatic cleanup**: Deletes files older than specified retention period (default: 90 days)
-- **Dry-run mode**: Preview what would be deleted before actual cleanup
-- **Size reporting**: Shows freed disk space after cleanup
-- **Multi-camera support**: Works with the same camera configuration
-- **Cross-platform**: Compatible with Linux, macOS, and FreeBSD
-- **Safe execution**: File locking prevents overlapping cleanup runs
-
-### Setup Retention Script
-
-#### 1. Configure Cleanup Script
-Edit `apply_camera_retention.sh` to match your camera destinations:
-```bash
-CAMERAS=(
-  "/volume3/Camera/Tuin:garden"
-  "/volume3/Camera/Oprit:driveway"
-  "/volume3/Camera/Front:front"
-)
-
-RETENTION_DAYS=90  # Delete files older than 90 days
-DRY_RUN=false     # Set to true for preview mode
-```
-
-**Note**: Use only the destination paths from your sync script (not the source paths).
-
-#### 2. Test Retention Script
-```bash
-# SSH into your Synology
-ssh admin@your-synology-ip
-
-# Test with dry-run (safe preview)
-sed -i 's/DRY_RUN=false/DRY_RUN=true/' /volume1/synology_hikvision_sync/src/apply_camera_retention.sh
-/volume1/synology_hikvision_sync/src/apply_camera_retention.sh
-
-# Enable actual retention when ready
-sed -i 's/DRY_RUN=true/DRY_RUN=false/' /volume1/synology_hikvision_sync/src/apply_camera_retention.sh
-```
-
-#### 3. Schedule Cleanup Task
-1. Open **Control Panel** → **Task Scheduler**
-2. Click **Create** → **Scheduled Task** → **User-defined script**
-3. **General tab**:
-   - Task name: `Camera Retention Policy`
-   - User: `root`
-4. **Schedule tab**:
-   - Run on: `Daily`
-   - Time: `02:00` (2 AM - low activity time)
-5. **Task Settings tab**:
-   - User-defined script: `/volume1/synology_hikvision_sync/src/apply_camera_retention.sh`
-6. Click **OK**
-
-### Retention Configuration Examples
-
-#### Conservative Retention (6 months)
-```bash
-RETENTION_DAYS=180
-```
-
-#### Aggressive Retention (30 days)
-```bash
-RETENTION_DAYS=30
-```
-
-#### Preview Mode for Testing
-```bash
-DRY_RUN=true  # Shows what would be deleted without actually deleting
-```
-
-### Monitor Cleanup Activity
-```bash
-# View retention logs
-sudo tail -f /var/log/messages | grep apply_camera_retention
-
-# Check Task Scheduler history
-# Control Panel → Task Scheduler → Camera Retention Policy → Action → View Result
-```
-
-## Testing
-
-The project includes comprehensive testing tools for validating script functionality before deployment.
-
-### Testing Options
-
-#### 1. Bats Framework (Recommended)
-**Bats** is the bash equivalent of pytest - a dedicated testing framework for shell scripts.
-
-```bash
-# Install Bats on macOS
-brew install bats-core
-
-# Install Bats on Linux
-git clone https://github.com/bats-core/bats-core.git
-cd bats-core
-sudo ./install.sh /usr/local
-
-# Run tests
-bats tests/test_sync_camera.bats
-```
-
-#### 2. Manual Testing with Mock Data
-For quick testing without installing frameworks:
-
-```bash
-# Generate realistic test data
-chmod +x tests/setup_test_data.sh
-./tests/setup_test_data.sh
-
-# This creates:
-# - Mock Hikvision camera directories with .mp4 and .pic files
-# - Files with different ages (some too new, some ready to process)
-# - Empty .pic files (should be skipped)
-# - Pre-existing cleaned files for retention testing
-```
-
-### Test Coverage
-
-The test suite validates:
-- ✅ **Script syntax**: Bash syntax validation
-- ✅ **Cross-platform compatibility**: stat/date command variations
-- ✅ **File age logic**: Only processes files older than AGE_SEC
-- ✅ **Size validation**: Skips zero-byte .pic files
-- ✅ **Directory creation**: Creates video/ and images/ folders
-- ✅ **Error handling**: Graceful handling of missing directories
-- ✅ **File locking**: Prevents concurrent execution
-- ✅ **Dry-run mode**: Cleanup preview without deletion
-- ✅ **Logging format**: Timestamp formatting validation
-
-### Running Tests
-
-#### Using Make (Recommended)
-```bash
-# Run all tests (syntax + bats tests)
-make test
-
-# Run individual test suites
-make test-sync          # Sync script tests only
-make test-retention     # Retention script tests only
-make test-pretty        # Tests with colorized output
-
-# Check syntax without execution
-make syntax-check
-
-# Check dependencies
-make check-deps
-```
-
-#### Manual Testing Commands
-```bash
-# Validate script syntax (no execution)
-bash -n src/sync_camera_synology.sh
-bash -n src/apply_camera_retention.sh
-
-# Run individual test suites
-bats tests/test_sync_camera.bats
-bats tests/test_retention.bats
-
-# Run specific test
-bats tests/test_sync_camera.bats -f "cross-platform"
-```
-
-#### Manual Testing Workflow
-
-**Using Make:**
-```bash
-# 1. Create test environment
-make test-data
-
-# 2. Edit scripts to use test paths from ./test_data_output/test_config.sh
-# 3. Test scripts safely on mock data
-# 4. Clean up when done
-make clean
-```
-
-**Manual approach:**
-```bash
-# 1. Set up test environment
-./tests/setup_test_data.sh ./my_test_data
-
-# 2. Edit scripts to use test data
-# Replace CAMERAS array with test paths from my_test_data/test_config.sh
-
-# 3. Test sync script (safe - uses test data)
-./src/sync_camera_synology.sh
-
-# 4. Test retention in dry-run mode
-DRY_RUN=true ./src/apply_camera_retention.sh
-
-# 5. Clean up test data
-rm -rf ./my_test_data
-```
-
-### Integration Testing on Synology
-
-Before deploying to production:
-
-```bash
-# 1. Test on Synology with real paths but dry-run retention
-ssh admin@your-synology-ip
-/volume1/synology_hikvision_sync/src/sync_camera_synology.sh  # Run sync once
-sed -i 's/DRY_RUN=false/DRY_RUN=true/' /volume1/synology_hikvision_sync/src/apply_camera_retention.sh
-/volume1/synology_hikvision_sync/src/apply_camera_retention.sh  # Preview retention policy
-
-# 2. Monitor logs during test
-tail -f /var/log/messages | grep -E "(sync_camera|apply_camera_retention)"
-
-# 3. Enable actual retention when satisfied
-sed -i 's/DRY_RUN=true/DRY_RUN=false/' /volume1/synology_hikvision_sync/src/apply_camera_retention.sh
-```
+MIT License - see LICENSE file for details.
