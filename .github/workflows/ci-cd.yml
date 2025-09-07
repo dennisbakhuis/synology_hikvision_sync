@@ -60,18 +60,40 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Found version: $VERSION"
         
-    - name: Check if version already exists
+    - name: Check if version already exists in GHCR
       id: check_version
       run: |
         VERSION="${{ steps.version.outputs.version }}"
         IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
         
-        # Check if the version tag already exists
-        if docker manifest inspect "$IMAGE_NAME:v$VERSION" > /dev/null 2>&1; then
-          echo "Version v$VERSION already exists, skipping build"
-          echo "should_build=false" >> $GITHUB_OUTPUT
+        # Check if the version tag already exists in GitHub Container Registry
+        echo "Checking if $IMAGE_NAME:v$VERSION exists in GHCR..."
+        
+        # Use GitHub API to check if the image exists
+        RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/${{ github.event.repository.name }}/versions" \
+        )
+        
+        if [ "$RESPONSE" = "200" ]; then
+          # Get package versions and check if our version exists
+          VERSION_EXISTS=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/${{ github.event.repository.name }}/versions" \
+            | jq -r --arg version "v$VERSION" '.[] | select(.metadata.container.tags[]? == $version) | .metadata.container.tags[]' \
+            | grep -x "v$VERSION" || echo "")
+          
+          if [ -n "$VERSION_EXISTS" ]; then
+            echo "Version v$VERSION already exists in GHCR, skipping build"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version v$VERSION does not exist in GHCR, proceeding with build"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
         else
-          echo "Version v$VERSION does not exist, proceeding with build"
+          echo "Could not check GHCR packages (HTTP $RESPONSE), proceeding with build"
           echo "should_build=true" >> $GITHUB_OUTPUT
         fi
         
