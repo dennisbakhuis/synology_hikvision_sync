@@ -51,14 +51,14 @@ docker run -d \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 
 # Run once and exit
 docker run --rm -e RUN_MODE=once \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 ```
 
 ### Camera Mounting Pattern
@@ -71,7 +71,7 @@ docker run -d \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume3/Camera-Front:/input/Camera-Front \
   -v /volume1/organized:/output \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
   
 # With camera renaming using CAMERA_TRANSLATION
 docker run -d \
@@ -80,7 +80,7 @@ docker run -d \
   -v /volume3/Camera-Front:/input/Camera-Front \
   -v /volume1/organized:/output \
   -e CAMERA_TRANSLATION="Camera-Tuin:tuin,Camera-Oprit:driveway,Camera-Front:front" \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 ```
 
 This will create organized output like:
@@ -108,21 +108,21 @@ docker run -d -e CRON_INTERVAL=5 \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 
 # Run every hour  
 docker run -d -e CRON_INTERVAL=60 \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 
 # Run every 6 hours
 docker run -d -e CRON_INTERVAL=360 \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 ```
 
 ### Camera Translation (Optional)
@@ -135,7 +135,7 @@ docker run -d \
   -v /volume3/Camera-Front:/input/Camera-Front \
   -v /volume1/organized:/output \
   -e CAMERA_TRANSLATION="Camera-Tuin:tuin,Camera-Oprit:driveway,Camera-Front:front" \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 ```
 
 **Translation Format**: `"original-name:new-name,another-original:another-new"`
@@ -148,14 +148,14 @@ docker run -d -e RETENTION_DAYS=30 \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
   
 # Disable retention (keep all files)
 docker run -d -e RETENTION_DAYS=0 \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 ```
 
 ### Advanced Configuration
@@ -171,7 +171,7 @@ docker run -d \
   -e CAMERA_TRANSLATION="Camera-Tuin:garden,Camera-Oprit:driveway,Camera-Front:entrance" \
   -e CACHE_DIR=/cache \
   -e LOCK_FILE=/cache/processing.lock \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 ```
 
 ## 📁 Directory Structure
@@ -281,7 +281,7 @@ ssh admin@your-synology-ip
 sudo docker run --rm \
   -v /volume1/your-camera-path:/input \
   -v /volume1/organized-output:/output \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 ```
 
 ### Persistent Container Setup  
@@ -295,7 +295,7 @@ sudo docker run --rm \
      -v /volume1/organized:/output \
      -e CRON_INTERVAL=10 \
      -e CAMERA_TRANSLATION="Camera-Tuin:tuin,Camera-Oprit:driveway,Camera-Front:front" \
-     ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+     ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
    ```
 
 2. **Monitor logs**:
@@ -322,7 +322,7 @@ If you prefer the old approach using Task Scheduler:
      -v /volume3/Camera-Front:/input/Camera-Front \
      -v /volume1/organized:/output \
      -e CAMERA_TRANSLATION="Camera-Tuin:tuin,Camera-Oprit:driveway,Camera-Front:front" \
-     ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+     ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
    ```
 
 ## 🐛 Troubleshooting
@@ -340,7 +340,7 @@ docker run --rm -e RUN_MODE=once \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
-  ghcr.io/dennisbakhuis/synology_hikvision_sync:latest
+  ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 
 # Monitor running container logs
 docker logs -f hikvision-sync
@@ -354,8 +354,8 @@ docker logs -f hikvision-sync
 ## 📈 Container Registry
 
 The container is automatically built and published to:
-- `ghcr.io/dennisbakhuis/synology_hikvision_sync:latest`
-- `ghcr.io/dennisbakhuis/synology_hikvision_sync:main`
+- `ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0` (current version)
+- `ghcr.io/dennisbakhuis/synology_hikvision_sync:latest` (latest stable release)
 - Tagged versions for specific releases
 
 ## 🤝 Contributing
