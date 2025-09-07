@@ -37,6 +37,7 @@ RUN apk add --no-cache \
     libgcc \
     libstdc++ \
     dcron \
+    ffmpeg \
     && rm -rf /var/cache/apk/*
 
 # Copy virtual environment from builder stage

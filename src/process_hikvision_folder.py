@@ -369,10 +369,6 @@ class HikvisionSync:
                     else:
                         segment_dt = start_time
                         
-                    segment_timestamp = segment_dt.timestamp()
-                    
-                    # Process all segments (age check removed)
-                        
                     # Format timestamp for filename
                     ts_formatted = segment_dt.strftime('%Y-%m-%d_%H-%M-%S')
                     
@@ -391,14 +387,7 @@ class HikvisionSync:
                         temp_video_name = f"video_{num}.mp4"
                         
                         # Try extracting - let libhikvision handle the path resolution
-                        self.log(f"Attempting to extract segment {num} to cache_dir: {self.cache_dir}")
-                        self.log(f"Cache dir exists: {os.path.exists(self.cache_dir)}, writable: {os.access(self.cache_dir, os.W_OK)}")
-                        self.log(f"Output video destination: {video_dest}")
-                        self.log(f"Output dir exists: {os.path.exists(os.path.dirname(video_dest))}, writable: {os.access(os.path.dirname(video_dest), os.W_OK)}")
-                        
                         extracted_path = hik.extract_segment_mp4(num, self.cache_dir, temp_video_name)
-                        self.log(f"libhikvision extract_segment_mp4 returned: {extracted_path}")
-                        
                         if extracted_path:
                             # Use the actual path returned by the library
                             if os.path.exists(extracted_path) and os.path.getsize(extracted_path) > 0:
@@ -409,7 +398,7 @@ class HikvisionSync:
                             else:
                                 self.log(f"Video extraction succeeded but file not found or empty: {extracted_path}")
                         else:
-                            self.log(f"Video extraction failed for segment {num} - libhikvision returned None/False")
+                            self.log(f"Video extraction failed for segment {num}")
                     except Exception as e:
                         self.log(f"Extract video error for segment {num}: {e}")
                         
