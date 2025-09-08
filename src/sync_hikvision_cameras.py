@@ -378,7 +378,7 @@ class HikvisionSync:
             and 'failed' counts for processed segments
         """
         try:
-            hikvision_instance = libHikvision(source_path, media_type)
+            hikvision_instance = libHikvision(f"{str(source_path)}/", media_type)
             segments_list = hikvision_instance.getSegments()
             self.log(f"Found {len(segments_list)} {media_type} segments for camera {camera_tag}")
             

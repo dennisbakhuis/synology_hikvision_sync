@@ -62,6 +62,7 @@ ENV CAMERA_TRANSLATION="" \
     SYNC_INTERVAL_MINUTES="10" \
     RUN_MODE="scheduled" \
     PYTHONPATH="/app" \
+    PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
 # Make entrypoint script executable
