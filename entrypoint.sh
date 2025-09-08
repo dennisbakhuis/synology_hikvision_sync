@@ -30,17 +30,29 @@ run_scheduled() {
     # Validate interval
     validate_interval "$SYNC_INTERVAL_MINUTES"
     
-    # Export environment variables and run Python scheduler
-    export SYNC_INTERVAL_MINUTES
-    export RUN_MODE
-    exec python src/sync_hikvision_cameras.py
+    # Run Python scheduler with arguments
+    exec python src/sync_hikvision_cameras.py \
+        --run-mode scheduled \
+        --sync-interval "$SYNC_INTERVAL_MINUTES" \
+        --input-dir "${INPUT_DIR:-/input}" \
+        --output-dir "${OUTPUT_DIR:-/output}" \
+        --cache-dir "${CACHE_DIR:-/tmp/hikvision_cache}" \
+        --lock-file "${LOCK_FILE:-/tmp/sync_hikvision_cameras.lock}" \
+        --retention-days "${RETENTION_DAYS:-90}" \
+        --camera-translation "${CAMERA_TRANSLATION:-}"
 }
 
 # Function to run once
 run_once() {
     echo "Running Hikvision sync once..."
-    export RUN_MODE="once"
-    exec python src/sync_hikvision_cameras.py
+    exec python src/sync_hikvision_cameras.py \
+        --run-mode once \
+        --input-dir "${INPUT_DIR:-/input}" \
+        --output-dir "${OUTPUT_DIR:-/output}" \
+        --cache-dir "${CACHE_DIR:-/tmp/hikvision_cache}" \
+        --lock-file "${LOCK_FILE:-/tmp/sync_hikvision_cameras.lock}" \
+        --retention-days "${RETENTION_DAYS:-90}" \
+        --camera-translation "${CAMERA_TRANSLATION:-}"
 }
 
 # Main execution logic
