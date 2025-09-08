@@ -10,47 +10,52 @@ all: help
 # Run the Python script
 run:
 	@echo "🚀 Running Hikvision sync script..."
-	@uv run python src/process_hikvision_folder.py
+	@uv run python src/sync_hikvision_cameras.py
 
 # Run all tests
-test: test-unit test-integration test-edge test-loggers test-extraction test-coverage-report
+test: test-unit test-integration test-edge test-loggers test-extraction test-system test-coverage-report
 	@echo "✅ All tests completed successfully with coverage report"
 
 # Run unit tests
 test-unit:
 	@echo "🧪 Running unit tests..."
-	@uv run pytest tests/test_init.py tests/test_log.py tests/test_acquire_lock.py tests/test_create_directories.py tests/test_get_unique_filename.py tests/test_atomic_write.py tests/test_process_camera.py tests/test_run.py tests/test_segment_parsing.py tests/test_camera_discovery.py -v
+	@uv run pytest tests/test_parse_camera_translation.py tests/test_discover_cameras.py tests/test_log_message.py tests/test_hikvision_sync_init.py tests/test_hikvision_sync_logging.py -v
 
 # Run integration tests
 test-integration:
 	@echo "🔗 Running integration tests..."
-	@uv run pytest tests/test_integration.py -v
+	@uv run pytest tests/test_hikvision_sync_integration.py -v
 
 # Run edge case tests
 test-edge:
 	@echo "🔍 Running edge case tests..."
-	@uv run pytest tests/test_edge_cases.py -v
+	@uv run pytest tests/test_hikvision_sync_retention_policy.py -v
 
 # Run logger tests
 test-loggers:
 	@echo "📝 Running logger tests..."
-	@uv run pytest tests/test_loggers.py -v
+	@uv run pytest tests/test_log_message.py tests/test_hikvision_sync_logging.py -v
 
 # Run extraction tests
 test-extraction:
 	@echo "📤 Running extraction tests..."
-	@uv run pytest tests/test_extraction.py -v
+	@uv run pytest tests/test_hikvision_sync_process_camera.py tests/test_hikvision_sync_process_media.py -v
+
+# Run system tests
+test-system:
+	@echo "🏗️ Running system tests..."
+	@uv run pytest tests/test_hikvision_sync_locking.py tests/test_hikvision_sync_directories.py tests/test_hikvision_sync_summary_report.py tests/test_hikvision_sync_run.py tests/test_hikvision_scheduler.py -v
 
 # Run tests with coverage report
 test-coverage:
 	@echo "📊 Running tests with coverage..."
-	@uv run pytest --cov=src --cov-report=html --cov-report=term-missing tests/
+	@uv run pytest --cov=src --cov-report=html --cov-report=term-missing tests/test_*.py
 
 # Generate coverage report (used by main test target)
 test-coverage-report:
 	@echo ""
 	@echo "📊 Generating coverage report..."
-	@uv run pytest --cov=src --cov-report=html --cov-report=term-missing tests/ --quiet
+	@uv run pytest --cov=src --cov-report=html --cov-report=term-missing tests/test_*.py --quiet
 	@echo ""
 	@echo "📄 HTML coverage report generated in htmlcov/index.html"
 
@@ -67,7 +72,7 @@ test-pattern:
 # Check code syntax and style
 lint:
 	@echo "🔍 Checking code syntax and style..."
-	@uv run python -m py_compile src/process_hikvision_folder.py && echo "  ✓ src/process_hikvision_folder.py syntax OK"
+	@uv run python -m py_compile src/sync_hikvision_cameras.py && echo "  ✓ src/sync_hikvision_cameras.py syntax OK"
 	@uv run pytest --collect-only tests/ >/dev/null && echo "  ✓ All test files syntax OK"
 
 # Docker operations
@@ -98,7 +103,7 @@ docker-run:
 
 docker-test:
 	@echo "🧪 Testing Docker image..."
-	@docker run --rm synology_hikvision_sync python -c "import sys; sys.path.insert(0, '/app/src'); import process_hikvision_folder; print('✓ Docker image works correctly')"
+	@docker run --rm synology_hikvision_sync python -c "import sys; sys.path.insert(0, '/app/src'); import sync_hikvision_cameras; print('✓ Docker image works correctly')"
 
 docker-build-and-test: docker-build docker-test
 	@echo "🎉 Docker image built and tested successfully!"
@@ -113,7 +118,7 @@ install-dev:
 clean:
 	@echo "🧹 Cleaning up..."
 	@rm -rf /tmp/hikvision_cache
-	@rm -f /tmp/process_hikvision_folder.lock
+	@rm -f /tmp/sync_hikvision_cameras.lock
 	@rm -rf __pycache__
 	@rm -rf src/__pycache__
 	@rm -rf tests/__pycache__

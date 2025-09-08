@@ -250,7 +250,7 @@ uv run python -m pytest tests/ -v
 uv sync
 
 # Run locally
-uv run python src/process_hikvision_folder.py
+uv run python src/sync_hikvision_cameras.py
 ```
 
 ## 📋 Environment Variables
@@ -263,7 +263,7 @@ uv run python src/process_hikvision_folder.py
 | `INPUT_DIR` | `/input` | Directory containing camera folders |
 | `OUTPUT_DIR` | `/output` | Directory for organized output |
 | `CACHE_DIR` | `/tmp/hikvision_cache` | Temporary extraction cache |
-| `LOCK_FILE` | `/tmp/process_hikvision_folder.lock` | Lock file location |
+| `LOCK_FILE` | `/tmp/sync_hikvision_cameras.lock` | Lock file location |
 | `CAMERA_TRANSLATION` | `""` | Camera name mappings (optional) |
 
 ## 🔧 Synology Integration
