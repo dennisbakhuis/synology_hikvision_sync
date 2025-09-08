@@ -13,45 +13,47 @@
             "justMyCode": false
         },
         {
-            "name": "Hikvision Sync: Debug Once",
+            "name": "Hikvision Sync: Local Test Once",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/process_hikvision_folder.py",
+            "program": "${workspaceFolder}/src/sync_hikvision_cameras.py",
             "console": "integratedTerminal",
             "justMyCode": false,
+            "cwd": "${workspaceFolder}",
             "args": [
-                "--input-dir", "./local/input",
-                "--output-dir", "./local/output",
-                "--cache-dir", "./local/cache",
-                "--lock-file", "./local/hikvision_sync.lock",
+                "--input-dir", "${workspaceFolder}/local/input",
+                "--output-dir", "${workspaceFolder}/local/output",
+                "--cache-dir", "${workspaceFolder}/local/cache",
+                "--lock-file", "${workspaceFolder}/local/hikvision_sync.lock",
                 "--camera-translation", "Camera-Tuin:garden,Camera-Oprit:driveway",
                 "--retention-days", "90",
                 "--run-mode", "once"
             ]
         },
         {
-            "name": "Hikvision Sync: Debug Scheduled",
+            "name": "Hikvision Sync: Local Test Scheduled (1min)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/process_hikvision_folder.py",
+            "program": "${workspaceFolder}/src/sync_hikvision_cameras.py",
             "console": "integratedTerminal",
             "justMyCode": false,
+            "cwd": "${workspaceFolder}",
             "args": [
-                "--input-dir", "./local/input",
-                "--output-dir", "./local/output",
-                "--cache-dir", "./local/cache",
-                "--lock-file", "./local/hikvision_sync.lock",
+                "--input-dir", "${workspaceFolder}/local/input",
+                "--output-dir", "${workspaceFolder}/local/output",
+                "--cache-dir", "${workspaceFolder}/local/cache",
+                "--lock-file", "${workspaceFolder}/local/hikvision_sync.lock",
                 "--camera-translation", "Camera-Tuin:garden,Camera-Oprit:driveway",
                 "--retention-days", "90",
                 "--run-mode", "scheduled",
-                "--sync-interval", "5"
+                "--sync-interval", "1"
             ]
         },
         {
             "name": "Hikvision Sync: Debug Default Cameras",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/process_hikvision_folder.py",
+            "program": "${workspaceFolder}/src/sync_hikvision_cameras.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [

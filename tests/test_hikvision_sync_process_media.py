@@ -47,7 +47,7 @@ class TestHikvisionSyncProcessMedia:
                                 assert result == expected
                                 
                                 # Verify libHikvision was called correctly
-                                mock_lib.assert_called_once_with("/src", "video")
+                                mock_lib.assert_called_once_with("/src/", "video")
                                 assert mock_instance.extractSegmentMP4.call_count == 2
     
     def test_process_media_image_success(self):
@@ -76,7 +76,7 @@ class TestHikvisionSyncProcessMedia:
                                 assert result == expected
                                 
                                 # Verify libHikvision was called correctly for images
-                                mock_lib.assert_called_once_with("/src", "image")
+                                mock_lib.assert_called_once_with("/src/", "image")
                                 mock_instance.extractSegmentJPG.assert_called_once()
     
     def test_process_media_existing_files_skipped(self):
