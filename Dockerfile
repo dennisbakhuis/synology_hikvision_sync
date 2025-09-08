@@ -26,17 +26,19 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install Python dependencies into virtual environment
 RUN uv pip install --no-cache-dir -e .
 
+# Quick-fix bug in libhikvision package v3.9
+RUN sed -i 's/-c:a none/-an/g' /opt/venv/lib/python3.13/site-packages/libhikvision/__init__.py
+
 # Stage 2: Runtime image
 FROM python:3.13-alpine AS runtime
 
 # Set working directory
 WORKDIR /app
 
-# Install only runtime dependencies (no build tools)
+# Install only runtime dependencies (no build tools, no cron)
 RUN apk add --no-cache \
     libgcc \
     libstdc++ \
-    dcron \
     ffmpeg \
     && rm -rf /var/cache/apk/*
 
@@ -53,10 +55,10 @@ RUN mkdir -p /input /output /tmp/hikvision_cache
 # Environment variables for configuration
 ENV CAMERA_TRANSLATION="" \
     CACHE_DIR="/tmp/hikvision_cache" \
-    LOCK_FILE="/tmp/process_hikvision_folder.lock" \
+    LOCK_FILE="/tmp/sync_hikvision_cameras.lock" \
     RETENTION_DAYS="90" \
-    CRON_INTERVAL="10" \
-    RUN_MODE="cron" \
+    SYNC_INTERVAL_MINUTES="10" \
+    RUN_MODE="scheduled" \
     PYTHONPATH="/app" \
     PATH="/opt/venv/bin:$PATH"
 
@@ -65,7 +67,7 @@ RUN chmod +x /app/entrypoint.sh
 
 # Health check to ensure the application can start
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; sys.path.insert(0, '/app/src'); import process_hikvision_folder; print('OK')" || exit 1
+    CMD python -c "import sys; sys.path.insert(0, '/app/src'); import sync_hikvision_cameras; print('OK')" || exit 1
 
 # Default entrypoint
 ENTRYPOINT ["./entrypoint.sh"]

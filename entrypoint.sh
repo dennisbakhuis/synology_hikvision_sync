@@ -1,75 +1,46 @@
 #!/bin/sh
 
 # Entrypoint script for Hikvision sync container
-# Supports both one-time execution and cron-based periodic execution
+# Uses Python's built-in scheduler instead of cron
 
 set -e
 
 # Default values
-CRON_INTERVAL=${CRON_INTERVAL:-10}
-RUN_MODE=${RUN_MODE:-"cron"}
+SYNC_INTERVAL_MINUTES=${SYNC_INTERVAL_MINUTES:-10}
+RUN_MODE=${RUN_MODE:-"scheduled"}
 
-# Function to validate cron interval
+# Function to validate sync interval
 validate_interval() {
     if ! echo "$1" | grep -qE '^[1-9][0-9]*$'; then
-        echo "Error: CRON_INTERVAL must be a positive integer (minutes)"
+        echo "Error: SYNC_INTERVAL_MINUTES must be a positive integer (minutes)"
         exit 1
     fi
     
     if [ "$1" -lt 1 ] || [ "$1" -gt 1440 ]; then
-        echo "Error: CRON_INTERVAL must be between 1 and 1440 minutes (24 hours)"
+        echo "Error: SYNC_INTERVAL_MINUTES must be between 1 and 1440 minutes (24 hours)"
         exit 1
     fi
 }
 
-# Function to setup cron job
-setup_cron() {
-    echo "Setting up cron job to run every $CRON_INTERVAL minutes..."
+# Function to run scheduled mode
+run_scheduled() {
+    echo "Starting Hikvision sync in scheduled mode..."
+    echo "Sync interval: $SYNC_INTERVAL_MINUTES minutes"
     
     # Validate interval
-    validate_interval "$CRON_INTERVAL"
+    validate_interval "$SYNC_INTERVAL_MINUTES"
     
-    # Create cron entry
-    CRON_SCHEDULE="*/$CRON_INTERVAL * * * *"
-    
-    # Create the cron command with all environment variables
-    CRON_COMMAND="cd /app && env"
-    CRON_COMMAND="$CRON_COMMAND CAMERA_TRANSLATION=\"$CAMERA_TRANSLATION\""
-    CRON_COMMAND="$CRON_COMMAND CACHE_DIR=\"$CACHE_DIR\""
-    CRON_COMMAND="$CRON_COMMAND LOCK_FILE=\"$LOCK_FILE\""
-    CRON_COMMAND="$CRON_COMMAND RETENTION_DAYS=\"$RETENTION_DAYS\""
-    CRON_COMMAND="$CRON_COMMAND PYTHONPATH=\"$PYTHONPATH\""
-    CRON_COMMAND="$CRON_COMMAND PATH=\"$PATH\""
-    CRON_COMMAND="$CRON_COMMAND python src/process_hikvision_folder.py"
-    
-    # Add logging
-    CRON_COMMAND="$CRON_COMMAND >> /proc/1/fd/1 2>> /proc/1/fd/2"
-    
-    # Create crontab entry
-    echo "$CRON_SCHEDULE $CRON_COMMAND" > /tmp/crontab
-    
-    # Install crontab
-    crontab /tmp/crontab
-    
-    # Clean up
-    rm /tmp/crontab
-    
-    echo "Cron job installed: $CRON_SCHEDULE"
-    echo "Script will run every $CRON_INTERVAL minutes"
-    
-    # Run once immediately on startup
-    echo "Running initial sync..."
-    python src/process_hikvision_folder.py
-    
-    # Start cron daemon
-    echo "Starting cron daemon..."
-    exec crond -f -l 2
+    # Export environment variables and run Python scheduler
+    export SYNC_INTERVAL_MINUTES
+    export RUN_MODE
+    exec python src/sync_hikvision_cameras.py
 }
 
 # Function to run once
 run_once() {
     echo "Running Hikvision sync once..."
-    exec python src/process_hikvision_folder.py
+    export RUN_MODE="once"
+    exec python src/sync_hikvision_cameras.py
 }
 
 # Main execution logic
@@ -77,11 +48,17 @@ case "$RUN_MODE" in
     "once")
         run_once
         ;;
+    "scheduled")
+        run_scheduled
+        ;;
+    # Backward compatibility with old 'cron' mode
     "cron")
-        setup_cron
+        echo "Warning: 'cron' mode is deprecated, using 'scheduled' mode instead"
+        RUN_MODE="scheduled"
+        run_scheduled
         ;;
     *)
-        echo "Error: RUN_MODE must be either 'once' or 'cron'"
+        echo "Error: RUN_MODE must be either 'once' or 'scheduled'"
         echo "Current value: $RUN_MODE"
         exit 1
         ;;
