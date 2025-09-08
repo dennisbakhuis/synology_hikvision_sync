@@ -22,6 +22,8 @@ This script is specifically designed for setups where:
 **Author**: Dennis Bakhuis  
 **License**: MIT
 
+> **Note**: This project uses the excellent [libhikvision](https://github.com/bkbilly/libHikvision) library by Vasilis Koulis, which is based on the original PHP version by [Dave Hope](https://github.com/davehope/libHikvision).
+
 ## 🏗️ **System Architecture**
 
 ```
@@ -41,9 +43,43 @@ This script is specifically designed for setups where:
 3. 🐳 Run this container to process and organize the footage
 4. 📂 Access clean, organized files in `/volume1/organized/`
 
-## 🚀 Quick Start with Docker
+## 🚀 Synology Quick Deploy (Recommended)
 
-The easiest way to use this tool is with the pre-built container from GitHub Container Registry:
+The easiest way to deploy on Synology NAS is using **Container Manager** with docker-compose:
+
+### 1. Create Project in Container Manager
+1. Open **Container Manager** in DSM
+2. Go to **Project** tab → **Create**
+3. Choose project name (e.g., "hikvision-sync")
+4. Create a `docker-compose.yml` file:
+
+```yaml
+services:
+  hikvision-sync:
+    image: ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
+    container_name: hikvision-sync
+    restart: unless-stopped
+    volumes:
+      # Mount each camera directory separately
+      - /volume3/Camera-Tuin:/input/Camera-Tuin
+      - /volume3/Camera-Oprit:/input/Camera-Oprit
+      # Add more cameras as needed:
+      # - /volume3/Camera-Front:/input/Camera-Front
+      - /volume1/organized:/output
+    environment:
+      # Sync every 10 minutes (default)
+      SYNC_INTERVAL_MINUTES: "10"
+      # Use friendly camera names
+      CAMERA_TRANSLATION: "Camera-Tuin:garden,Camera-Oprit:driveway"
+      # Keep files for 90 days (default)
+      RETENTION_DAYS: "90"
+```
+
+5. **Build** and **Start** the project
+
+### 2. Alternative: Command Line Docker
+
+For direct Docker usage:
 
 ```bash
 # Run continuously (every 10 minutes by default)
@@ -99,26 +135,26 @@ This will create organized output like:
 
 ## 🔧 Configuration
 
-### Cron Scheduling
-Control how frequently the sync runs:
+### Sync Scheduling
+Control how frequently the sync runs using Python's built-in scheduler:
 
 ```bash
 # Run every 5 minutes
-docker run -d -e CRON_INTERVAL=5 \
+docker run -d -e SYNC_INTERVAL_MINUTES=5 \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
   ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 
 # Run every hour  
-docker run -d -e CRON_INTERVAL=60 \
+docker run -d -e SYNC_INTERVAL_MINUTES=60 \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
   ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 
 # Run every 6 hours
-docker run -d -e CRON_INTERVAL=360 \
+docker run -d -e SYNC_INTERVAL_MINUTES=360 \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
@@ -166,7 +202,7 @@ docker run -d \
   -v /volume3/Camera-Front:/input/Camera-Front \
   -v /volume1/organized:/output \
   -v /tmp/hikvision_cache:/cache \
-  -e CRON_INTERVAL=15 \
+  -e SYNC_INTERVAL_MINUTES=15 \
   -e RETENTION_DAYS=60 \
   -e CAMERA_TRANSLATION="Camera-Tuin:garden,Camera-Oprit:driveway,Camera-Front:entrance" \
   -e CACHE_DIR=/cache \
@@ -257,8 +293,8 @@ uv run python src/sync_hikvision_cameras.py
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RUN_MODE` | `cron` | Execution mode: `cron` (continuous) or `once` (single run) |
-| `CRON_INTERVAL` | `10` | Minutes between sync runs (1-1440) |
+| `RUN_MODE` | `scheduled` | Execution mode: `scheduled` (continuous) or `once` (single run) |
+| `SYNC_INTERVAL_MINUTES` | `10` | Minutes between sync runs (1-1440) |
 | `RETENTION_DAYS` | `90` | Days to keep files (0 = disabled) |
 | `INPUT_DIR` | `/input` | Directory containing camera folders |
 | `OUTPUT_DIR` | `/output` | Directory for organized output |
@@ -293,7 +329,7 @@ sudo docker run --rm \
      -v /volume3/Camera-Oprit:/input/Camera-Oprit \
      -v /volume3/Camera-Front:/input/Camera-Front \
      -v /volume1/organized:/output \
-     -e CRON_INTERVAL=10 \
+     -e SYNC_INTERVAL_MINUTES=10 \
      -e CAMERA_TRANSLATION="Camera-Tuin:tuin,Camera-Oprit:driveway,Camera-Front:front" \
      ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
    ```
