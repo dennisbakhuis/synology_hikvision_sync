@@ -25,7 +25,7 @@ DEFAULT_INPUT_DIR = '/input'
 DEFAULT_OUTPUT_DIR = '/output'
 DEFAULT_RETENTION_DAYS = 90
 DEFAULT_SYNC_INTERVAL_MINUTES = 10
-DEFAULT_RUN_MODE = 'once'
+DEFAULT_RUN_MODE = 'scheduled'
 
 
 def parse_camera_translation(translation_env: str) -> dict[str, str]:
