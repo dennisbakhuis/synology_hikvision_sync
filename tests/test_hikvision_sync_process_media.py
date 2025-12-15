@@ -38,22 +38,25 @@ class TestHikvisionSyncProcessMedia:
                 with patch("os.path.exists", return_value=True):
                     with patch("os.path.getsize", return_value=1024):
                         with patch("pathlib.Path.mkdir"):
-                            with patch("pathlib.Path.iterdir", return_value=[]):
-                                result = sync._process_media(
-                                    "/src", "/dst", "test_cam", "video"
-                                )
+                            with patch("pathlib.Path.exists", return_value=True):
+                                with patch("os.listdir", return_value=[]):
+                                    result = sync._process_media(
+                                        "/src", "/dst", "test_cam", "video"
+                                    )
 
-                                expected = {
-                                    "total": 2,
-                                    "existing": 0,
-                                    "new": 2,
-                                    "failed": 0,
-                                }
-                                assert result == expected
+                                    expected = {
+                                        "total": 2,
+                                        "existing": 0,
+                                        "new": 2,
+                                        "failed": 0,
+                                    }
+                                    assert result == expected
 
-                                # Verify libHikvision was called correctly
-                                mock_lib.assert_called_once_with("/src/", "video")
-                                assert mock_instance.extractSegmentMP4.call_count == 2
+                                    # Verify libHikvision was called correctly
+                                    mock_lib.assert_called_once_with("/src/", "video")
+                                    assert (
+                                        mock_instance.extractSegmentMP4.call_count == 2
+                                    )
 
     def test_process_media_image_success(self) -> None:
         """Test successful image media processing"""
@@ -75,22 +78,23 @@ class TestHikvisionSyncProcessMedia:
                 with patch("os.path.exists", return_value=True):
                     with patch("os.path.getsize", return_value=1024):
                         with patch("pathlib.Path.mkdir"):
-                            with patch("pathlib.Path.iterdir", return_value=[]):
-                                result = sync._process_media(
-                                    "/src", "/dst", "test_cam", "image"
-                                )
+                            with patch("pathlib.Path.exists", return_value=True):
+                                with patch("os.listdir", return_value=[]):
+                                    result = sync._process_media(
+                                        "/src", "/dst", "test_cam", "image"
+                                    )
 
-                                expected = {
-                                    "total": 1,
-                                    "existing": 0,
-                                    "new": 1,
-                                    "failed": 0,
-                                }
-                                assert result == expected
+                                    expected = {
+                                        "total": 1,
+                                        "existing": 0,
+                                        "new": 1,
+                                        "failed": 0,
+                                    }
+                                    assert result == expected
 
-                                # Verify libHikvision was called correctly for images
-                                mock_lib.assert_called_once_with("/src/", "image")
-                                mock_instance.extractSegmentJPG.assert_called_once()
+                                    # Verify libHikvision was called correctly for images
+                                    mock_lib.assert_called_once_with("/src/", "image")
+                                    mock_instance.extractSegmentJPG.assert_called_once()
 
     def test_process_media_existing_files_skipped(self) -> None:
         """Test that existing files are skipped"""
@@ -111,24 +115,22 @@ class TestHikvisionSyncProcessMedia:
                 with patch("pathlib.Path.mkdir"):
                     # Mock that a file already exists with the same name
                     with patch("pathlib.Path.exists", return_value=True):
-                        with patch("pathlib.Path.iterdir") as mock_iterdir:
-                            # Mock existing file with matching timestamp
-                            mock_file = Mock()
-                            mock_file.name = f"{recent_time.strftime('%Y-%m-%d_%H-%M-%S')}-test_cam.mp4"
-                            mock_file.is_file.return_value = True
-                            mock_iterdir.return_value = [mock_file]
+                        filename = (
+                            f"{recent_time.strftime('%Y-%m-%d_%H-%M-%S')}-test_cam.mp4"
+                        )
+                        with patch("os.listdir", return_value=[filename]):
+                            with patch("os.path.isfile", return_value=True):
+                                result = sync._process_media(
+                                    "/src", "/dst", "test_cam", "video"
+                                )
 
-                            result = sync._process_media(
-                                "/src", "/dst", "test_cam", "video"
-                            )
-
-                            expected = {
-                                "total": 1,
-                                "existing": 1,
-                                "new": 0,
-                                "failed": 0,
-                            }
-                            assert result == expected
+                                expected = {
+                                    "total": 1,
+                                    "existing": 1,
+                                    "new": 0,
+                                    "failed": 0,
+                                }
+                                assert result == expected
 
     def test_process_media_extraction_failure(self) -> None:
         """Test handling of extraction failures"""
@@ -149,18 +151,19 @@ class TestHikvisionSyncProcessMedia:
             with patch.object(sync, "log"):
                 with patch("os.path.exists", return_value=False):
                     with patch("pathlib.Path.mkdir"):
-                        with patch("pathlib.Path.iterdir", return_value=[]):
-                            result = sync._process_media(
-                                "/src", "/dst", "test_cam", "video"
-                            )
+                        with patch("pathlib.Path.exists", return_value=True):
+                            with patch("os.listdir", return_value=[]):
+                                result = sync._process_media(
+                                    "/src", "/dst", "test_cam", "video"
+                                )
 
-                            expected = {
-                                "total": 1,
-                                "existing": 0,
-                                "new": 0,
-                                "failed": 1,
-                            }
-                            assert result == expected
+                                expected = {
+                                    "total": 1,
+                                    "existing": 0,
+                                    "new": 0,
+                                    "failed": 1,
+                                }
+                                assert result == expected
 
     def test_process_media_missing_timestamp(self) -> None:
         """Test handling of segments with missing timestamps"""
@@ -183,19 +186,20 @@ class TestHikvisionSyncProcessMedia:
                 with patch("os.path.exists", return_value=True):
                     with patch("os.path.getsize", return_value=1024):
                         with patch("pathlib.Path.mkdir"):
-                            with patch("pathlib.Path.iterdir", return_value=[]):
-                                result = sync._process_media(
-                                    "/src", "/dst", "test_cam", "video"
-                                )
+                            with patch("pathlib.Path.exists", return_value=True):
+                                with patch("os.listdir", return_value=[]):
+                                    result = sync._process_media(
+                                        "/src", "/dst", "test_cam", "video"
+                                    )
 
-                                # Should only process valid segment
-                                expected = {
-                                    "total": 2,
-                                    "existing": 0,
-                                    "new": 1,
-                                    "failed": 0,
-                                }
-                                assert result == expected
+                                    # Should only process valid segment
+                                    expected = {
+                                        "total": 2,
+                                        "existing": 0,
+                                        "new": 1,
+                                        "failed": 0,
+                                    }
+                                    assert result == expected
 
     def test_process_media_segment_exception(self) -> None:
         """Test handling of exceptions during segment processing"""
@@ -215,13 +219,19 @@ class TestHikvisionSyncProcessMedia:
 
             with patch.object(sync, "log"):
                 with patch("pathlib.Path.mkdir"):
-                    with patch("pathlib.Path.iterdir", return_value=[]):
-                        result = sync._process_media(
-                            "/src", "/dst", "test_cam", "video"
-                        )
+                    with patch("pathlib.Path.exists", return_value=True):
+                        with patch("os.listdir", return_value=[]):
+                            result = sync._process_media(
+                                "/src", "/dst", "test_cam", "video"
+                            )
 
-                        expected = {"total": 1, "existing": 0, "new": 0, "failed": 1}
-                        assert result == expected
+                            expected = {
+                                "total": 1,
+                                "existing": 0,
+                                "new": 0,
+                                "failed": 1,
+                            }
+                            assert result == expected
 
     def test_process_media_library_exception(self) -> None:
         """Test handling of libHikvision library exceptions"""

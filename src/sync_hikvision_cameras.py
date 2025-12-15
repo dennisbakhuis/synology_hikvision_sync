@@ -353,20 +353,30 @@ class HikvisionSync:
             )
             media_directory.mkdir(parents=True, exist_ok=True)
 
-            existing_files_set = (
-                {file.name for file in media_directory.iterdir() if file.is_file()}
-                if media_directory.exists()
-                else set()
-            )
+            if media_directory.exists():
+                try:
+                    existing_files_set = {
+                        name
+                        for name in os.listdir(media_directory)
+                        if os.path.isfile(os.path.join(media_directory, name))
+                    }
+                except (OSError, PermissionError) as e:
+                    self.log(
+                        f"Warning: Could not list directory {media_directory}: {e}"
+                    )
+                    existing_files_set = set()
+            else:
+                existing_files_set = set()
 
             new_files_count = existing_files_count = failed_files_count = (
                 skipped_old_count
-            ) = 0
+            ) = skipped_no_timestamp_count = 0
 
             for segment_number, segment_data in enumerate(segments_list):
                 try:
                     segment_start_time = segment_data.get("cust_startTime")
                     if not segment_start_time:
+                        skipped_no_timestamp_count += 1
                         continue
 
                     if cutoff_time and segment_start_time < cutoff_time:
@@ -419,6 +429,18 @@ class HikvisionSync:
             if existing_files_count > 0:
                 self.log(
                     f"Skipped {existing_files_count} existing {media_type} files for camera {camera_tag}"
+                )
+            if skipped_old_count > 0:
+                self.log(
+                    f"Skipped {skipped_old_count} old {media_type} segments (beyond retention period) for camera {camera_tag}"
+                )
+            if skipped_no_timestamp_count > 0:
+                self.log(
+                    f"Skipped {skipped_no_timestamp_count} {media_type} segments (missing timestamp) for camera {camera_tag}"
+                )
+            if failed_files_count > 0:
+                self.log(
+                    f"Failed to process {failed_files_count} {media_type} segments for camera {camera_tag}"
                 )
 
             return {
