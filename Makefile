@@ -2,7 +2,7 @@
 # Author: Dennis Bakhuis
 # Date: 2025-09-06
 
-.PHONY: run test test-unit test-integration test-edge test-loggers test-extraction test-coverage clean install-dev help
+.PHONY: run test test-unit test-integration test-edge test-loggers test-extraction test-coverage clean install-dev help types
 
 # Default target
 all: help
@@ -134,6 +134,10 @@ clean:
 test-watch:
 	@echo "👀 Running tests in watch mode..."
 	@uv run pytest-watch
+
+# Run mypy to check types (requires mypy)
+types:
+	uv run mypy .
 
 # Show usage information
 help:

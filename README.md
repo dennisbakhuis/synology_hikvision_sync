@@ -13,13 +13,13 @@ This script is specifically designed for setups where:
 
 **Benefits over Surveillance Station:**
 - ✅ No NVR license costs per camera
-- ✅ Uses cameras' native intelligence and processing power  
+- ✅ Uses cameras' native intelligence and processing power
 - ✅ Direct NFS storage - no transcoding overhead
 - ✅ Automated retention management
 - ✅ Clean, accessible file organization
 - ✅ Preserves original video quality
 
-**Author**: Dennis Bakhuis  
+**Author**: Dennis Bakhuis
 **License**: MIT
 
 > **Note**: This project uses the excellent [libhikvision](https://github.com/bkbilly/libHikvision) library by Vasilis Koulis, which is based on the original PHP version by [Dave Hope](https://github.com/davehope/libHikvision).
@@ -39,7 +39,7 @@ This script is specifically designed for setups where:
 
 **Setup Requirements:**
 1. 🔧 Configure Hikvision cameras to use Synology NAS as NFS storage target
-2. 📁 Cameras record directly to `/volume3/Camera-Name/` directories  
+2. 📁 Cameras record directly to `/volume3/Camera-Name/` directories
 3. 🐳 Run this container to process and organize the footage
 4. 📂 Access clean, organized files in `/volume1/organized/`
 
@@ -108,7 +108,7 @@ docker run -d \
   -v /volume3/Camera-Front:/input/Camera-Front \
   -v /volume1/organized:/output \
   ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
-  
+
 # With camera renaming using CAMERA_TRANSLATION
 docker run -d \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
@@ -125,7 +125,7 @@ This will create organized output like:
 ├── tuin/           # Renamed from Camera-Tuin
 │   ├── video/
 │   └── images/
-├── driveway/       # Renamed from Camera-Oprit  
+├── driveway/       # Renamed from Camera-Oprit
 │   ├── video/
 │   └── images/
 └── front/          # Renamed from Camera-Front
@@ -136,7 +136,12 @@ This will create organized output like:
 ## 🔧 Configuration
 
 ### Sync Scheduling
-Control how frequently the sync runs using Python's built-in scheduler:
+Control how frequently the sync runs using shell-based scheduling for better resilience:
+
+**Key Benefits:**
+- Shell restarts Python after each interval - network failures don't stop the scheduler
+- Lock file mechanism prevents overlapping runs
+- Graceful shutdown via SIGTERM/SIGINT signals
 
 ```bash
 # Run every 5 minutes
@@ -146,7 +151,7 @@ docker run -d -e SYNC_INTERVAL_MINUTES=5 \
   -v /volume1/organized:/output \
   ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 
-# Run every hour  
+# Run every hour
 docker run -d -e SYNC_INTERVAL_MINUTES=60 \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
@@ -185,7 +190,7 @@ docker run -d -e RETENTION_DAYS=30 \
   -v /volume3/Camera-Oprit:/input/Camera-Oprit \
   -v /volume1/organized:/output \
   ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
-  
+
 # Disable retention (keep all files)
 docker run -d -e RETENTION_DAYS=0 \
   -v /volume3/Camera-Tuin:/input/Camera-Tuin \
@@ -246,7 +251,7 @@ Container Output:                 Host Synology:
 ## ✨ Features
 
 - 📂 **NFS Integration**: Designed specifically for Synology NAS as NFS storage target
-- 🔄 **Automatic Discovery**: Discovers cameras from NFS-mounted directory structure  
+- 🔄 **Automatic Discovery**: Discovers cameras from NFS-mounted directory structure
 - 📹 **Format Conversion**: Converts Hikvision's proprietary format to standard MP4/JPG files
 - 🏷️ **Smart Organization**: Creates timestamped filenames with customizable camera tags
 - 🗂️ **Surveillance Station Alternative**: Replaces expensive NVR licensing with camera intelligence
@@ -320,7 +325,7 @@ sudo docker run --rm \
   ghcr.io/dennisbakhuis/synology_hikvision_sync:v0.1.0
 ```
 
-### Persistent Container Setup  
+### Persistent Container Setup
 1. **SSH into Synology** and run:
    ```bash
    # Start persistent container with automatic restart
@@ -338,15 +343,15 @@ sudo docker run --rm \
    ```bash
    # View logs
    docker logs hikvision-sync
-   
-   # Follow logs in real-time  
+
+   # Follow logs in real-time
    docker logs -f hikvision-sync
    ```
 
 ### Alternative: One-time Task Setup
 If you prefer the old approach using Task Scheduler:
 1. **Control Panel** → **Task Scheduler**
-2. **Create** → **Scheduled Task** → **User-defined script**  
+2. **Create** → **Scheduled Task** → **User-defined script**
 3. Configure:
    - **General**: Task name: "Camera Sync"
    - **Schedule**: Daily, every 10 minutes
