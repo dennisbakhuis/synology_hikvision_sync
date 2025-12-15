@@ -10,8 +10,6 @@
 import os
 import sys
 import fcntl
-import time
-import signal
 import argparse
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -26,8 +24,6 @@ DEFAULT_CACHE_DIR = "/tmp/hikvision_cache"
 DEFAULT_INPUT_DIR = "/input"
 DEFAULT_OUTPUT_DIR = "/output"
 DEFAULT_RETENTION_DAYS = 90
-DEFAULT_SYNC_INTERVAL_MINUTES = 10
-DEFAULT_RUN_MODE = "once"
 
 
 def parse_camera_translation(translation_env: str) -> dict[str, str]:
@@ -120,78 +116,6 @@ def log_message(message: str) -> None:
     """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] {message}")
-
-
-class HikvisionScheduler:
-    """Scheduler for running HikvisionSync at regular intervals.
-
-    Parameters
-    ----------
-    sync_instance : HikvisionSync
-        Instance of HikvisionSync to run on schedule
-    interval_minutes : int
-        Interval between sync runs in minutes
-    """
-
-    def __init__(self, sync_instance: "HikvisionSync", interval_minutes: int) -> None:
-        self.sync = sync_instance
-        self.interval_minutes = interval_minutes
-        self.interval_seconds = interval_minutes * 60
-        self.running = False
-        self.setup_signal_handlers()
-
-    def setup_signal_handlers(self) -> None:
-        """Setup signal handlers for graceful shutdown.
-
-        Sets up handlers for SIGTERM and SIGINT signals to allow
-        graceful shutdown of the scheduler.
-        """
-
-        def signal_handler(signum: int, _frame: object) -> None:
-            signal_name = signal.Signals(signum).name
-            log_message(f"Received {signal_name} signal, shutting down gracefully...")
-            self.running = False
-
-        signal.signal(signal.SIGTERM, signal_handler)
-        signal.signal(signal.SIGINT, signal_handler)
-
-    def run_scheduled(self) -> int:
-        """Run the sync process in a loop with the specified interval.
-
-        Returns
-        -------
-        int
-            Exit code: 0 if stopped gracefully, 1 if error occurred
-        """
-        log_message(f"Starting scheduler: sync every {self.interval_minutes} minutes")
-        self.running = True
-
-        try:
-            log_message("Running initial sync...")
-            self.sync.run()
-
-            while self.running:
-                log_message(
-                    f"Waiting {self.interval_minutes} minutes until next sync..."
-                )
-
-                elapsed = 0
-                while elapsed < self.interval_seconds and self.running:
-                    time.sleep(1)
-                    elapsed += 1
-
-                if self.running:  # pragma: no cover
-                    log_message("Starting scheduled sync...")
-                    self.sync.run()
-
-        except KeyboardInterrupt:
-            log_message("Interrupted by user")
-        except Exception as e:
-            log_message(f"Scheduler error: {e}")
-        finally:
-            log_message("Scheduler stopped")
-
-        return 0 if not self.running else 1
 
 
 class HikvisionSync:
@@ -417,6 +341,10 @@ class HikvisionSync:
                 f"Found {len(segments_list)} {media_type} segments for camera {camera_tag}"
             )
 
+            cutoff_time = None
+            if self.retention_days > 0:
+                cutoff_time = datetime.now() - timedelta(days=self.retention_days)
+
             file_extension = "mp4" if media_type == "video" else "jpg"
             media_directory = (
                 Path(destination_path) / f"{media_type}s"
@@ -431,12 +359,18 @@ class HikvisionSync:
                 else set()
             )
 
-            new_files_count = existing_files_count = failed_files_count = 0
+            new_files_count = existing_files_count = failed_files_count = (
+                skipped_old_count
+            ) = 0
 
             for segment_number, segment_data in enumerate(segments_list):
                 try:
                     segment_start_time = segment_data.get("cust_startTime")
                     if not segment_start_time:
+                        continue
+
+                    if cutoff_time and segment_start_time < cutoff_time:
+                        skipped_old_count += 1
                         continue
 
                     timestamp_formatted = segment_start_time.strftime(
@@ -470,9 +404,6 @@ class HikvisionSync:
                         and os.path.exists(destination_file_path)
                         and os.path.getsize(destination_file_path) > 0
                     ):
-                        self.log(
-                            f"Extracted {media_type}: {destination_file_path} [{camera_tag}]"
-                        )
                         new_files_count += 1
                         existing_files_set.add(output_filename)
                     else:
@@ -481,6 +412,10 @@ class HikvisionSync:
                 except Exception:
                     failed_files_count += 1
 
+            if new_files_count > 0:
+                self.log(
+                    f"Downloaded {new_files_count} new {media_type} files for camera {camera_tag}"
+                )
             if existing_files_count > 0:
                 self.log(
                     f"Skipped {existing_files_count} existing {media_type} files for camera {camera_tag}"
@@ -564,6 +499,10 @@ class HikvisionSync:
             return 1
 
         try:
+            start_time = datetime.now()
+            self.log(
+                f"=== SYNC STARTED at {start_time.strftime('%Y-%m-%d %H:%M:%S')} ==="
+            )
             self.log(f"Starting sync for {len(self.cameras)} camera(s)")
             self.create_directories()
 
@@ -575,7 +514,12 @@ class HikvisionSync:
 
             deleted_files_count = self.apply_retention_policy()
             self._generate_summary_report(all_camera_statistics, deleted_files_count)
-            self.log("Sync completed")
+
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+            self.log(
+                f"=== SYNC COMPLETED at {end_time.strftime('%Y-%m-%d %H:%M:%S')} (duration: {duration:.1f}s) ==="
+            )
             return 0
 
         except KeyboardInterrupt:
@@ -609,10 +553,6 @@ def create_argument_parser() -> argparse.ArgumentParser:  # pragma: no cover
         Camera translation mapping
     RETENTION_DAYS : int
         Number of days to retain files
-    RUN_MODE : str
-        Run mode (once or scheduled)
-    SYNC_INTERVAL_MINUTES : int
-        Sync interval in minutes for scheduled mode
 
     Returns
     -------
@@ -671,37 +611,12 @@ def create_argument_parser() -> argparse.ArgumentParser:  # pragma: no cover
         help=f"Number of days to retain files (0 disables retention) (default: {DEFAULT_RETENTION_DAYS})",
     )
 
-    parser.add_argument(
-        "--run-mode",
-        "-m",
-        type=str,
-        choices=["once", "scheduled"],
-        default=os.getenv("RUN_MODE", DEFAULT_RUN_MODE).lower(),
-        help=f"Run mode: once or scheduled (default: {DEFAULT_RUN_MODE})",
-    )
-
-    parser.add_argument(
-        "--sync-interval",
-        "-s",
-        type=int,
-        default=int(
-            os.getenv("SYNC_INTERVAL_MINUTES", str(DEFAULT_SYNC_INTERVAL_MINUTES))
-        ),
-        help=f"Sync interval in minutes for scheduled mode (1-1440) (default: {DEFAULT_SYNC_INTERVAL_MINUTES})",
-    )
-
     return parser
 
 
 if __name__ == "__main__":  # pragma: no cover
     parser = create_argument_parser()
     args = parser.parse_args()
-
-    # Validate arguments
-    if args.sync_interval < 1 or args.sync_interval > 1440:
-        parser.error(
-            f"sync-interval must be between 1 and 1440 minutes, got: {args.sync_interval}"
-        )
 
     translation_map = parse_camera_translation(args.camera_translation)
 
@@ -728,14 +643,4 @@ if __name__ == "__main__":  # pragma: no cover
         retention_days=args.retention_days,
     )
 
-    if args.run_mode == "once":
-        print("Running sync once...")
-        sys.exit(sync.run())
-    elif args.run_mode == "scheduled":
-        print("WARNING: Python-based scheduling is deprecated.")
-        print(
-            "Please use shell-based scheduling (RUN_MODE=scheduled in entrypoint.sh)."
-        )
-        print(f"Running sync in scheduled mode (every {args.sync_interval} minutes)...")
-        scheduler = HikvisionScheduler(sync, args.sync_interval)
-        sys.exit(scheduler.run_scheduled())
+    sys.exit(sync.run())

@@ -47,7 +47,6 @@ validate_interval() {
 # Function to run Python sync once
 run_python_sync() {
     python src/sync_hikvision_cameras.py \
-        --run-mode once \
         --input-dir "${INPUT_DIR:-/input}" \
         --output-dir "${OUTPUT_DIR:-/output}" \
         --cache-dir "${CACHE_DIR:-/tmp/hikvision_cache}" \
@@ -100,7 +99,6 @@ run_once() {
 
     # Use exec to replace shell with Python (maintains PID 1)
     exec python src/sync_hikvision_cameras.py \
-        --run-mode once \
         --input-dir "${INPUT_DIR:-/input}" \
         --output-dir "${OUTPUT_DIR:-/output}" \
         --cache-dir "${CACHE_DIR:-/tmp/hikvision_cache}" \
