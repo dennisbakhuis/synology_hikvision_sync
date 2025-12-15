@@ -6,7 +6,7 @@ Tests for HikvisionSync._process_media method
 import os
 import sys
 from unittest.mock import patch, Mock
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -21,10 +21,11 @@ class TestHikvisionSyncProcessMedia:
         """Test successful video media processing"""
         sync = HikvisionSync(cameras=[("/test/src", "/test/dst", "test_cam")])
 
-        # Mock segment data
+        # Mock segment data - use recent dates within retention period
+        recent_time = datetime.now() - timedelta(days=1)
         mock_segments = [
-            {"cust_startTime": datetime(2023, 1, 1, 12, 0, 0)},
-            {"cust_startTime": datetime(2023, 1, 1, 12, 5, 0)},
+            {"cust_startTime": recent_time},
+            {"cust_startTime": recent_time + timedelta(minutes=5)},
         ]
 
         with patch("sync_hikvision_cameras.libHikvision") as mock_lib:
@@ -58,9 +59,10 @@ class TestHikvisionSyncProcessMedia:
         """Test successful image media processing"""
         sync = HikvisionSync(cameras=[("/test/src", "/test/dst", "test_cam")])
 
-        # Mock segment data
+        # Mock segment data - use recent date within retention period
+        recent_time = datetime.now() - timedelta(days=1)
         mock_segments = [
-            {"cust_startTime": datetime(2023, 1, 1, 12, 0, 0)},
+            {"cust_startTime": recent_time},
         ]
 
         with patch("sync_hikvision_cameras.libHikvision") as mock_lib:
@@ -94,8 +96,10 @@ class TestHikvisionSyncProcessMedia:
         """Test that existing files are skipped"""
         sync = HikvisionSync(cameras=[("/test/src", "/test/dst", "test_cam")])
 
+        # Use recent date within retention period
+        recent_time = datetime.now() - timedelta(days=1)
         mock_segments = [
-            {"cust_startTime": datetime(2023, 1, 1, 12, 0, 0)},
+            {"cust_startTime": recent_time},
         ]
 
         with patch("sync_hikvision_cameras.libHikvision") as mock_lib:
@@ -108,9 +112,9 @@ class TestHikvisionSyncProcessMedia:
                     # Mock that a file already exists with the same name
                     with patch("pathlib.Path.exists", return_value=True):
                         with patch("pathlib.Path.iterdir") as mock_iterdir:
-                            # Mock existing file
+                            # Mock existing file with matching timestamp
                             mock_file = Mock()
-                            mock_file.name = "2023-01-01_12-00-00-test_cam.mp4"
+                            mock_file.name = f"{recent_time.strftime('%Y-%m-%d_%H-%M-%S')}-test_cam.mp4"
                             mock_file.is_file.return_value = True
                             mock_iterdir.return_value = [mock_file]
 
@@ -130,8 +134,10 @@ class TestHikvisionSyncProcessMedia:
         """Test handling of extraction failures"""
         sync = HikvisionSync(cameras=[("/test/src", "/test/dst", "test_cam")])
 
+        # Use recent date within retention period
+        recent_time = datetime.now() - timedelta(days=1)
         mock_segments = [
-            {"cust_startTime": datetime(2023, 1, 1, 12, 0, 0)},
+            {"cust_startTime": recent_time},
         ]
 
         with patch("sync_hikvision_cameras.libHikvision") as mock_lib:
@@ -160,9 +166,11 @@ class TestHikvisionSyncProcessMedia:
         """Test handling of segments with missing timestamps"""
         sync = HikvisionSync(cameras=[("/test/src", "/test/dst", "test_cam")])
 
+        # Use recent date within retention period
+        recent_time = datetime.now() - timedelta(days=1)
         mock_segments = [
             {"cust_startTime": None},  # Missing timestamp
-            {"cust_startTime": datetime(2023, 1, 1, 12, 0, 0)},  # Valid timestamp
+            {"cust_startTime": recent_time},  # Valid timestamp
         ]
 
         with patch("sync_hikvision_cameras.libHikvision") as mock_lib:
@@ -193,8 +201,10 @@ class TestHikvisionSyncProcessMedia:
         """Test handling of exceptions during segment processing"""
         sync = HikvisionSync(cameras=[("/test/src", "/test/dst", "test_cam")])
 
+        # Use recent date within retention period
+        recent_time = datetime.now() - timedelta(days=1)
         mock_segments = [
-            {"cust_startTime": datetime(2023, 1, 1, 12, 0, 0)},
+            {"cust_startTime": recent_time},
         ]
 
         with patch("sync_hikvision_cameras.libHikvision") as mock_lib:
