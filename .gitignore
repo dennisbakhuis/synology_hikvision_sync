@@ -17,3 +17,6 @@ htmlcov/
 *.log
 
 .coverage
+.claude/
+.mypy_cache
+.ruff_cache
