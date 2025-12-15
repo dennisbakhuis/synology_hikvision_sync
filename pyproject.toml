@@ -16,6 +16,7 @@ dev = [
     "pytest>=8.4.2",
     "pytest-cov>=6.0.0",
     "pytest-mock>=3.14.0",
+    "ruff>=0.14.9",
 ]
 
 [tool.mypy]
@@ -35,19 +36,5 @@ show_column_numbers = true
 pretty = true
 
 [[tool.mypy.overrides]]
-module = [
-    "reflex.*",
-    "mistletoe.*",
-    "frontmatter.*",
-]
+module = ["libhikvision.*"]
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = [
-    "voorvoet_website.components.language_switcher",
-    "voorvoet_website.pages.shared_sections.header",
-    "voorvoet_website.components.blog_paragraph",
-    "voorvoet_website.components.blog_markdown",
-    "voorvoet_website.components.blog_list",
-]
-warn_unused_ignores = false

@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from collections.abc import Sequence
 from typing import TextIO
 
-from libhikvision import libHikvision  # type: ignore[import-not-found]
+from libhikvision import libHikvision
 
 
 DEFAULT_LOCK_FILE = "/tmp/sync_hikvision_cameras.lock"
@@ -547,7 +547,7 @@ class HikvisionSync:
             self.log(f"Retention: {deleted_files_count} old files deleted")
         if total_segments_processed:
             self.log(
-                f"Efficiency: {(total_existing_files/total_segments_processed)*100:.1f}% skipped"
+                f"Efficiency: {(total_existing_files / total_segments_processed) * 100:.1f}% skipped"
             )
         self.log("=" * 50)
 
