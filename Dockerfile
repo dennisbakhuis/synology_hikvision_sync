@@ -55,7 +55,7 @@ RUN mkdir -p /input /output /tmp/hikvision_cache
 # Environment variables for configuration
 ENV CAMERA_TRANSLATION="" \
     CACHE_DIR="/tmp/hikvision_cache" \
-    EXTRACTION_TIMEOUT_SECONDS="30" \
+    EXTRACTION_TIMEOUT_SECONDS="20" \
     IMAGE_SYNC_DAYS="7" \
     INPUT_DIR="/input" \
     LOCK_FILE="/tmp/sync_hikvision_cameras.lock" \
