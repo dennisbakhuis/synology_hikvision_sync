@@ -11,10 +11,12 @@ import os
 import sys
 import fcntl
 import argparse
+import signal
 from pathlib import Path
 from datetime import datetime, timedelta
-from collections.abc import Sequence
-from typing import TextIO
+from collections.abc import Sequence, Generator
+from contextlib import contextmanager
+from typing import TextIO, Any
 
 from libhikvision import libHikvision
 
@@ -24,6 +26,11 @@ DEFAULT_CACHE_DIR = "/tmp/hikvision_cache"
 DEFAULT_INPUT_DIR = "/input"
 DEFAULT_OUTPUT_DIR = "/output"
 DEFAULT_RETENTION_DAYS = 90
+DEFAULT_EXTRACTION_TIMEOUT_SECONDS = 60
+DEFAULT_VIDEO_SYNC_DAYS = 7
+DEFAULT_IMAGE_SYNC_DAYS = 7
+DEFAULT_SYNC_IMAGES = True
+DEFAULT_USE_FAST_EXTRACTION = True
 
 
 def parse_camera_translation(translation_env: str) -> dict[str, str]:
@@ -55,6 +62,59 @@ def parse_camera_translation(translation_env: str) -> dict[str, str]:
         print(f"Warning: Failed to parse camera translation '{translation_env}': {e}")
 
     return translation_map
+
+
+def parse_bool_env(env_var: str, default: bool = True) -> bool:
+    """Parse boolean from environment variable.
+
+    Parameters
+    ----------
+    env_var : str
+        Environment variable value to parse
+    default : bool, default=True
+        Default value if env_var is empty or invalid
+
+    Returns
+    -------
+    bool
+        Parsed boolean value
+    """
+    value = env_var.lower().strip()
+    if value in ("true", "1", "yes", "on"):
+        return True
+    elif value in ("false", "0", "no", "off"):
+        return False
+    return default
+
+
+@contextmanager
+def extraction_timeout(seconds: int) -> Generator[None, None, None]:
+    """Context manager for extraction timeout using SIGALRM.
+
+    Note: POSIX-only (Linux, macOS). Not compatible with Windows.
+    Works in Docker containers (Linux-based).
+
+    Parameters
+    ----------
+    seconds : int
+        Timeout duration in seconds
+
+    Raises
+    ------
+    TimeoutError
+        If operation exceeds timeout duration
+    """
+
+    def timeout_handler(signum: Any, frame: Any) -> None:
+        raise TimeoutError(f"Extraction timed out after {seconds} seconds")
+
+    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 
 def discover_cameras(
@@ -125,6 +185,11 @@ class HikvisionSync:
         lock_file: str | None = None,
         cache_directory: str | None = None,
         retention_days: int | None = None,
+        video_sync_days: int | None = None,
+        image_sync_days: int | None = None,
+        sync_images: bool = True,
+        extraction_timeout_seconds: int | None = None,
+        use_fast_extraction: bool = True,
     ) -> None:
         if cameras is None:
             raise ValueError(
@@ -136,6 +201,19 @@ class HikvisionSync:
         self.retention_days = (
             retention_days if retention_days is not None else DEFAULT_RETENTION_DAYS
         )
+        self.video_sync_days = (
+            video_sync_days if video_sync_days is not None else DEFAULT_VIDEO_SYNC_DAYS
+        )
+        self.image_sync_days = (
+            image_sync_days if image_sync_days is not None else DEFAULT_IMAGE_SYNC_DAYS
+        )
+        self.sync_images = sync_images
+        self.extraction_timeout_seconds = (
+            extraction_timeout_seconds
+            if extraction_timeout_seconds is not None
+            else DEFAULT_EXTRACTION_TIMEOUT_SECONDS
+        )
+        self.use_fast_extraction = use_fast_extraction
         self.lock_file_descriptor: TextIO | None = None
 
     def log(self, message: str) -> None:
@@ -147,6 +225,62 @@ class HikvisionSync:
             Message to log
         """
         log_message(message)
+
+    def _is_same_filesystem(self, path1: Path, path2: Path) -> bool:
+        """Check if two paths are on the same filesystem.
+
+        Parameters
+        ----------
+        path1 : Path
+            First path to check
+        path2 : Path
+            Second path to check
+
+        Returns
+        -------
+        bool
+            True if both paths are on same filesystem, False otherwise
+        """
+        try:
+            return os.stat(path1).st_dev == os.stat(path2).st_dev
+        except OSError:
+            return False
+
+    def _extract_video_fast(self, segment: dict, output_path: Path) -> bool:
+        """Fast extraction for same-disk operations - copies byte range directly.
+
+        Parameters
+        ----------
+        segment : dict
+            Segment metadata from libHikvision with 'cust_filePath', 'startOffset', 'endOffset'
+        output_path : Path
+            Destination file path for extracted video
+
+        Returns
+        -------
+        bool
+            True if extraction succeeded, False if failed (for fallback to libHikvision)
+        """
+        try:
+            source_file = segment["cust_filePath"]
+            start_offset = segment["startOffset"]
+            end_offset = segment["endOffset"]
+
+            with open(source_file, "rb") as src, open(output_path, "wb") as dst:
+                src.seek(start_offset)
+                remaining = end_offset - start_offset
+                chunk_size = 4096
+
+                while remaining > 0:
+                    chunk = src.read(min(chunk_size, remaining))
+                    if not chunk:
+                        break
+                    dst.write(chunk)
+                    remaining -= len(chunk)
+
+            return True
+        except Exception:
+            return False
 
     def acquire_lock(self) -> bool:
         """Acquire file lock to prevent overlapping runs.
@@ -291,9 +425,14 @@ class HikvisionSync:
             video_statistics = self._process_media(
                 source_path, destination_path, camera_tag, "video"
             )
-            image_statistics = self._process_media(
-                source_path, destination_path, camera_tag, "image"
-            )
+
+            if self.sync_images:
+                image_statistics = self._process_media(
+                    source_path, destination_path, camera_tag, "image"
+                )
+            else:
+                self.log(f"Skipping image sync (disabled) for camera {camera_tag}")
+                image_statistics = {"total": 0, "existing": 0, "new": 0, "failed": 0}
 
             self.log(
                 f"Completed processing camera {camera_tag}: {video_statistics['new']} videos, {image_statistics['new']} images"
@@ -341,9 +480,12 @@ class HikvisionSync:
                 f"Found {len(segments_list)} {media_type} segments for camera {camera_tag}"
             )
 
+            sync_days = (
+                self.video_sync_days if media_type == "video" else self.image_sync_days
+            )
             cutoff_time = None
-            if self.retention_days > 0:
-                cutoff_time = datetime.now() - timedelta(days=self.retention_days)
+            if sync_days > 0:
+                cutoff_time = datetime.now() - timedelta(days=sync_days)
 
             file_extension = "mp4" if media_type == "video" else "jpg"
             media_directory = (
@@ -370,7 +512,7 @@ class HikvisionSync:
 
             new_files_count = existing_files_count = failed_files_count = (
                 skipped_old_count
-            ) = skipped_no_timestamp_count = 0
+            ) = skipped_no_timestamp_count = timed_out_count = fast_path_count = 0
 
             for segment_number, segment_data in enumerate(segments_list):
                 try:
@@ -396,28 +538,65 @@ class HikvisionSync:
 
                     destination_file_path = str(media_directory / output_filename)
 
-                    if media_type == "video":
-                        extraction_result = hikvision_instance.extractSegmentMP4(
-                            segment_number,
-                            cachePath=self.cache_directory,
-                            filename=destination_file_path,
+                    use_fast_path = (
+                        self.use_fast_extraction
+                        and media_type == "video"
+                        and self._is_same_filesystem(
+                            Path(source_path), Path(destination_path)
                         )
-                    else:
-                        extraction_result = hikvision_instance.extractSegmentJPG(
-                            segment_number,
-                            cachePath=self.cache_directory,
-                            filename=destination_file_path,
+                    )
+
+                    try:
+                        timeout_seconds = (
+                            self.extraction_timeout_seconds
+                            if self.extraction_timeout_seconds > 0
+                            else 999999
                         )
 
-                    if (
-                        extraction_result
-                        and os.path.exists(destination_file_path)
-                        and os.path.getsize(destination_file_path) > 0
-                    ):
-                        new_files_count += 1
-                        existing_files_set.add(output_filename)
-                    else:
-                        failed_files_count += 1
+                        with extraction_timeout(timeout_seconds):
+                            extraction_result = False
+
+                            if use_fast_path:
+                                extraction_result = self._extract_video_fast(
+                                    segment_data, Path(destination_file_path)
+                                )
+                                if extraction_result:
+                                    fast_path_count += 1
+
+                            if not extraction_result:
+                                if media_type == "video":
+                                    extraction_result = (
+                                        hikvision_instance.extractSegmentMP4(
+                                            segment_number,
+                                            cachePath=self.cache_directory,
+                                            filename=destination_file_path,
+                                        )
+                                    )
+                                else:
+                                    extraction_result = (
+                                        hikvision_instance.extractSegmentJPG(
+                                            segment_number,
+                                            cachePath=self.cache_directory,
+                                            filename=destination_file_path,
+                                        )
+                                    )
+
+                        if (
+                            extraction_result
+                            and os.path.exists(destination_file_path)
+                            and os.path.getsize(destination_file_path) > 0
+                        ):
+                            new_files_count += 1
+                            existing_files_set.add(output_filename)
+                        else:
+                            failed_files_count += 1
+
+                    except TimeoutError as e:
+                        timed_out_count += 1
+                        self.log(
+                            f"Timeout extracting {media_type} segment {segment_number} for camera {camera_tag}: {e}"
+                        )
+                        continue
 
                 except Exception:
                     failed_files_count += 1
@@ -432,7 +611,7 @@ class HikvisionSync:
                 )
             if skipped_old_count > 0:
                 self.log(
-                    f"Skipped {skipped_old_count} old {media_type} segments (beyond retention period) for camera {camera_tag}"
+                    f"Skipped {skipped_old_count} old {media_type} segments (beyond {sync_days}-day sync window) for camera {camera_tag}"
                 )
             if skipped_no_timestamp_count > 0:
                 self.log(
@@ -441,6 +620,14 @@ class HikvisionSync:
             if failed_files_count > 0:
                 self.log(
                     f"Failed to process {failed_files_count} {media_type} segments for camera {camera_tag}"
+                )
+            if timed_out_count > 0:
+                self.log(
+                    f"Timed out on {timed_out_count} {media_type} segments for camera {camera_tag}"
+                )
+            if fast_path_count > 0:
+                self.log(
+                    f"Used fast extraction for {fast_path_count} {media_type} segments for camera {camera_tag}"
                 )
 
             return {
@@ -575,6 +762,16 @@ def create_argument_parser() -> argparse.ArgumentParser:  # pragma: no cover
         Camera translation mapping
     RETENTION_DAYS : int
         Number of days to retain files
+    VIDEO_SYNC_DAYS : int
+        Number of days of video segments to sync
+    IMAGE_SYNC_DAYS : int
+        Number of days of image segments to sync
+    SYNC_IMAGES : bool
+        Enable or disable image synchronization
+    EXTRACTION_TIMEOUT_SECONDS : int
+        Timeout in seconds for extracting each segment
+    USE_FAST_EXTRACTION : bool
+        Enable fast extraction for same-disk operations
 
     Returns
     -------
@@ -633,6 +830,47 @@ def create_argument_parser() -> argparse.ArgumentParser:  # pragma: no cover
         help=f"Number of days to retain files (0 disables retention) (default: {DEFAULT_RETENTION_DAYS})",
     )
 
+    parser.add_argument(
+        "--video-sync-days",
+        type=int,
+        default=int(os.getenv("VIDEO_SYNC_DAYS", str(DEFAULT_VIDEO_SYNC_DAYS))),
+        help=f"Number of days of video segments to sync (0 syncs all) (default: {DEFAULT_VIDEO_SYNC_DAYS})",
+    )
+
+    parser.add_argument(
+        "--image-sync-days",
+        type=int,
+        default=int(os.getenv("IMAGE_SYNC_DAYS", str(DEFAULT_IMAGE_SYNC_DAYS))),
+        help=f"Number of days of image segments to sync (0 syncs all) (default: {DEFAULT_IMAGE_SYNC_DAYS})",
+    )
+
+    parser.add_argument(
+        "--sync-images",
+        type=lambda x: parse_bool_env(x, DEFAULT_SYNC_IMAGES),
+        default=parse_bool_env(os.getenv("SYNC_IMAGES", ""), DEFAULT_SYNC_IMAGES),
+        help=f"Enable or disable image synchronization (default: {DEFAULT_SYNC_IMAGES})",
+    )
+
+    parser.add_argument(
+        "--extraction-timeout",
+        type=int,
+        default=int(
+            os.getenv(
+                "EXTRACTION_TIMEOUT_SECONDS", str(DEFAULT_EXTRACTION_TIMEOUT_SECONDS)
+            )
+        ),
+        help=f"Timeout in seconds for extracting each segment (0 disables timeout) (default: {DEFAULT_EXTRACTION_TIMEOUT_SECONDS})",
+    )
+
+    parser.add_argument(
+        "--use-fast-extraction",
+        type=lambda x: parse_bool_env(x, DEFAULT_USE_FAST_EXTRACTION),
+        default=parse_bool_env(
+            os.getenv("USE_FAST_EXTRACTION", ""), DEFAULT_USE_FAST_EXTRACTION
+        ),
+        help=f"Enable fast extraction for same-disk operations (default: {DEFAULT_USE_FAST_EXTRACTION})",
+    )
+
     return parser
 
 
@@ -663,6 +901,11 @@ if __name__ == "__main__":  # pragma: no cover
         lock_file=args.lock_file,
         cache_directory=args.cache_dir,
         retention_days=args.retention_days,
+        video_sync_days=args.video_sync_days,
+        image_sync_days=args.image_sync_days,
+        sync_images=args.sync_images,
+        extraction_timeout_seconds=args.extraction_timeout,
+        use_fast_extraction=args.use_fast_extraction,
     )
 
     sys.exit(sync.run())
