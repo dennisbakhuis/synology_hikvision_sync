@@ -52,7 +52,12 @@ run_python_sync() {
         --cache-dir "${CACHE_DIR:-/tmp/hikvision_cache}" \
         --lock-file "${LOCK_FILE:-/tmp/sync_hikvision_cameras.lock}" \
         --retention-days "${RETENTION_DAYS:-90}" \
-        --camera-translation "${CAMERA_TRANSLATION:-}"
+        --camera-translation "${CAMERA_TRANSLATION:-}" \
+        --extraction-timeout "${EXTRACTION_TIMEOUT_SECONDS:-60}" \
+        --sync-images "${SYNC_IMAGES:-true}" \
+        --video-sync-days "${VIDEO_SYNC_DAYS:-7}" \
+        --image-sync-days "${IMAGE_SYNC_DAYS:-7}" \
+        --use-fast-extraction "${USE_FAST_EXTRACTION:-true}"
 
     return $?
 }
@@ -104,7 +109,12 @@ run_once() {
         --cache-dir "${CACHE_DIR:-/tmp/hikvision_cache}" \
         --lock-file "${LOCK_FILE:-/tmp/sync_hikvision_cameras.lock}" \
         --retention-days "${RETENTION_DAYS:-90}" \
-        --camera-translation "${CAMERA_TRANSLATION:-}"
+        --camera-translation "${CAMERA_TRANSLATION:-}" \
+        --extraction-timeout "${EXTRACTION_TIMEOUT_SECONDS:-60}" \
+        --sync-images "${SYNC_IMAGES:-true}" \
+        --video-sync-days "${VIDEO_SYNC_DAYS:-7}" \
+        --image-sync-days "${IMAGE_SYNC_DAYS:-7}" \
+        --use-fast-extraction "${USE_FAST_EXTRACTION:-true}"
 }
 
 # Main execution logic

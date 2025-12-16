@@ -55,11 +55,16 @@ RUN mkdir -p /input /output /tmp/hikvision_cache
 # Environment variables for configuration
 ENV CAMERA_TRANSLATION="" \
     CACHE_DIR="/tmp/hikvision_cache" \
+    EXTRACTION_TIMEOUT_SECONDS="30" \
+    IMAGE_SYNC_DAYS="7" \
     INPUT_DIR="/input" \
     LOCK_FILE="/tmp/sync_hikvision_cameras.lock" \
     OUTPUT_DIR="/output" \
     RETENTION_DAYS="90" \
+    SYNC_IMAGES="true" \
     SYNC_INTERVAL_MINUTES="10" \
+    USE_FAST_EXTRACTION="true" \
+    VIDEO_SYNC_DAYS="7" \
     RUN_MODE="scheduled" \
     PYTHONPATH="/app" \
     PYTHONUNBUFFERED=1 \
